@@ -1,0 +1,32 @@
+[
+  {
+    "id": "mentor_001",
+    "name": "Ahmad Razif",
+    "expertise": ["fintech", "payments", "cross-border"],
+    "background": "Ex-VP at Maybank, built cross-border payment products and led digital banking initiatives across Southeast Asia.",
+    "industries": ["fintech", "banking"],
+    "startup_stage": ["pre-seed", "seed"],
+    "availability": "2 sessions/month",
+    "location": "Kuala Lumpur"
+  },
+  {
+    "id": "mentor_002",
+    "name": "Priya Nair",
+    "expertise": ["B2B SaaS", "enterprise sales", "product strategy"],
+    "background": "Former Product Director at Salesforce APAC, scaled two B2B SaaS products from 0 to 1M ARR in Malaysia and Singapore.",
+    "industries": ["saas", "enterprise software", "HR tech"],
+    "startup_stage": ["seed", "series-a"],
+    "availability": "1 session/month",
+    "location": "Kuala Lumpur"
+  },
+  {
+    "id": "mentor_003",
+    "name": "David Tan",
+    "expertise": ["payments", "regulatory compliance", "BNM guidelines"],
+    "background": "Ex-Head of Payments at RHB Bank with 15 years in regulated payments infrastructure, licensed e-money operators, and BNM engagement.",
+    "industries": ["fintech", "payments", "regtech"],
+    "startup_stage": ["pre-seed", "seed", "series-a"],
+    "availability": "2 sessions/month",
+    "location": "Petaling Jaya"
+  }
+]

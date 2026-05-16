@@ -1,0 +1,66 @@
+[
+  {
+    "id": "partner_corp_001",
+    "partner_type": "corporate",
+    "name": "Mastercard",
+    "industries_interested": ["fintech", "payments", "e-commerce"],
+    "what_they_offer": ["pilot program", "API access", "co-marketing", "global network introductions"],
+    "past_initiatives": ["Mastercard Fintech Express 2025", "Start Path Program"],
+    "suitable_for_stage": ["seed", "series-a"],
+    "contact_type": "partnership"
+  },
+  {
+    "id": "partner_corp_002",
+    "partner_type": "corporate",
+    "name": "CIMB",
+    "industries_interested": ["fintech", "payments", "banking", "regtech"],
+    "what_they_offer": ["sandbox access", "banking API integration", "co-development pilots", "regulatory guidance"],
+    "past_initiatives": ["CIMB BizChannel API Partnership 2024"],
+    "suitable_for_stage": ["pre-seed", "seed", "series-a"],
+    "contact_type": "partnership"
+  },
+  {
+    "id": "partner_inv_001",
+    "partner_type": "investor",
+    "name": "Openspace Ventures",
+    "industries": ["fintech", "saas", "healthtech", "logistics"],
+    "investment_stage": ["seed", "series-a"],
+    "ticket_size_min": 500000,
+    "ticket_size_max": 3000000,
+    "investment_thesis": "B2B tech with SEA expansion potential and strong unit economics.",
+    "portfolio_companies": ["Funding Societies", "Doctor Anywhere", "Carro"],
+    "contact_type": "warm intro only"
+  },
+  {
+    "id": "partner_inv_002",
+    "partner_type": "investor",
+    "name": "Iterative",
+    "industries": ["saas", "fintech", "dev tools", "B2B"],
+    "investment_stage": ["pre-seed", "seed"],
+    "ticket_size_min": 150000,
+    "ticket_size_max": 500000,
+    "investment_thesis": "Early-stage B2B software companies with strong founder-market fit in Southeast Asia.",
+    "portfolio_companies": ["Jenfi", "Shipper", "Gigged.AI"],
+    "contact_type": "apply via website"
+  },
+  {
+    "id": "partner_svc_001",
+    "partner_type": "service_provider",
+    "name": "Wong & Partners",
+    "service_type": "legal",
+    "what_they_offer": ["startup incorporation", "term sheet review", "IP filing", "regulatory compliance advisory"],
+    "pricing_model": "discounted",
+    "suitable_for_stage": ["pre-seed", "seed"],
+    "contact_type": "referral"
+  },
+  {
+    "id": "partner_svc_002",
+    "partner_type": "service_provider",
+    "name": "AWS Activate",
+    "service_type": "cloud infrastructure",
+    "what_they_offer": ["AWS credits up to $100k", "technical support", "startup training", "marketplace listing"],
+    "pricing_model": "credits-based",
+    "suitable_for_stage": ["pre-seed", "seed", "series-a"],
+    "contact_type": "apply via portal"
+  }
+]

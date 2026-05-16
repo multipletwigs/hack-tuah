@@ -1,0 +1,47 @@
+[
+  {
+    "id": "programme_001",
+    "name": "CIP Accelerate",
+    "type": "accelerator",
+    "focus_industries": ["fintech", "healthtech", "edtech", "agritech"],
+    "eligibility": {
+      "stage": ["seed"],
+      "min_team_size": 2,
+      "must_be_malaysian": true
+    },
+    "funding_amount": 500000,
+    "benefits": ["mentorship", "lab access", "investor intros", "co-working space"],
+    "next_intake": "2026-Q3",
+    "owner": "Cradle"
+  },
+  {
+    "id": "programme_002",
+    "name": "GAIN Grant",
+    "type": "grant",
+    "focus_industries": ["fintech", "saas", "deep tech"],
+    "eligibility": {
+      "stage": ["pre-seed", "seed"],
+      "min_team_size": 1,
+      "must_be_malaysian": true
+    },
+    "funding_amount": 150000,
+    "benefits": ["non-dilutive funding", "Cradle network access", "quarterly reviews"],
+    "next_intake": "2026-Q2",
+    "owner": "Cradle"
+  },
+  {
+    "id": "programme_003",
+    "name": "Tech Startup Catalyst",
+    "type": "incubator",
+    "focus_industries": ["saas", "edtech", "HR tech", "healthtech"],
+    "eligibility": {
+      "stage": ["pre-seed", "seed", "series-a"],
+      "min_team_size": 2,
+      "must_be_malaysian": false
+    },
+    "funding_amount": 250000,
+    "benefits": ["6-month incubation", "technical mentorship", "market access workshops", "demo day"],
+    "next_intake": "2026-Q4",
+    "owner": "Cradle"
+  }
+]
