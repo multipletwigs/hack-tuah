@@ -5,7 +5,7 @@ import LinkageTable from '@/app/components/LinkageTable'
 import type { Linkage, ActorType, PartnerType } from '@/app/lib/types'
 
 interface Filters {
-  actorType: ActorType | ''
+  actorType: Exclude<ActorType, 'programme'> | ''
   partnerType: PartnerType | ''
   startup: string
   status: string
@@ -29,7 +29,7 @@ export default function LinkagesPage() {
   }
 
   const filtered = linkages.filter(l =>
-    (!filters.actorType   || l.actorType === filters.actorType) &&
+    (!filters.actorType   || l.actorType === filters.actorType || (filters.actorType === 'initiative' && l.actorType === 'programme')) &&
     (!filters.partnerType || l.partnerType === filters.partnerType) &&
     (!filters.startup     || l.startupName.toLowerCase().includes(filters.startup.toLowerCase())) &&
     (!filters.status      || l.status === filters.status)
@@ -64,7 +64,7 @@ export default function LinkagesPage() {
           <select id="f-actor" value={filters.actorType} onChange={e => handleFilter('actorType', e.target.value)}>
             <option value="">All</option>
             <option value="mentor">Mentor</option>
-            <option value="programme">Programme</option>
+            <option value="initiative">Initiative</option>
             <option value="partner">Partner</option>
           </select>
         </div>

@@ -15,7 +15,7 @@ function typeTagClass(t: string) {
 }
 
 interface FormState {
-  name: string; type: string; focusIndustries: string
+  name: string; type: string; description: string; focusIndustries: string
   fundingAmount: string; nextIntake: string; status: string
 }
 
@@ -23,7 +23,7 @@ export default function InitiativesPage() {
   const [initiatives, setInitiatives] = useState<Initiative[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
-  const [form, setForm] = useState<FormState>({ name: '', type: '', focusIndustries: '', fundingAmount: '', nextIntake: '', status: 'active' })
+  const [form, setForm] = useState<FormState>({ name: '', type: '', description: '', focusIndustries: '', fundingAmount: '', nextIntake: '', status: 'active' })
   const [saving, setSaving] = useState(false)
 
   function load() {
@@ -32,7 +32,7 @@ export default function InitiativesPage() {
 
   useEffect(() => { load() }, [])
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }))
   }
 
@@ -46,6 +46,7 @@ export default function InitiativesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: form.name, type: form.type,
+          description: form.description,
           focusIndustries: form.focusIndustries.split(',').map(s => s.trim()).filter(Boolean),
           fundingAmount: form.fundingAmount ? Number(form.fundingAmount) : null,
           nextIntake: form.nextIntake || null,
@@ -54,7 +55,7 @@ export default function InitiativesPage() {
       })
       if (!res.ok) throw new Error((await res.json()).error)
       setShowModal(false)
-      setForm({ name: '', type: '', focusIndustries: '', fundingAmount: '', nextIntake: '', status: 'active' })
+      setForm({ name: '', type: '', description: '', focusIndustries: '', fundingAmount: '', nextIntake: '', status: 'active' })
       load()
       showToast('Initiative added')
     } catch (err) {
@@ -68,7 +69,7 @@ export default function InitiativesPage() {
     <div className="admin-content">
       <div className="mgmt-header">
         <div className="mgmt-header-left">
-          <h1 className="page-title">Initiatives & Programmes</h1>
+          <h1 className="page-title">Initiatives</h1>
           {!loading && <span className="count-badge">{initiatives.length}</span>}
         </div>
         <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ Add Initiative</button>
@@ -77,17 +78,18 @@ export default function InitiativesPage() {
       <div className="mgmt-table-wrap">
         <table className="mgmt-table">
           <thead>
-            <tr><th>Name</th><th>Type</th><th>Focus Industries</th><th>Funding</th><th>Next Intake</th><th>Status</th></tr>
+            <tr><th>Name</th><th>Type</th><th>Description</th><th>Focus Industries</th><th>Funding</th><th>Next Intake</th><th>Status</th></tr>
           </thead>
           <tbody>
             {loading
-              ? <tr><td colSpan={6}><div className="empty-state">Loading…</div></td></tr>
+              ? <tr><td colSpan={7}><div className="empty-state">Loading…</div></td></tr>
               : initiatives.length === 0
-              ? <tr><td colSpan={6}><div className="empty-state">No initiatives yet.</div></td></tr>
+              ? <tr><td colSpan={7}><div className="empty-state">No initiatives yet.</div></td></tr>
               : initiatives.map(i => (
                 <tr key={i.initiativeId}>
                   <td><strong>{i.name}</strong></td>
                   <td><span className={`actor-tag ${typeTagClass(i.type)}`}>{i.type}</span></td>
+                  <td style={{ maxWidth: 280, color: '#475569', fontSize: '0.82rem' }}>{i.description || '—'}</td>
                   <td><div className="needs-chips">{i.focusIndustries.map(f => <span key={f} className="need-chip">{f}</span>)}</div></td>
                   <td>{i.fundingAmount ? `RM ${i.fundingAmount.toLocaleString()}` : '—'}</td>
                   <td>{i.nextIntake ?? '—'}</td>
@@ -117,6 +119,10 @@ export default function InitiativesPage() {
                   <option value="">Select…</option>
                   {INITIATIVE_TYPES.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
                 </select>
+              </div>
+              <div className="form-group">
+                <label>Description</label>
+                <textarea name="description" rows={3} value={form.description} onChange={handleChange} placeholder="Short description of what this initiative offers and who it targets." />
               </div>
               <div className="form-group">
                 <label>Focus Industries</label>

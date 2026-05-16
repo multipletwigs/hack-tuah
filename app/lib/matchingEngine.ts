@@ -27,7 +27,7 @@ interface ToolTrace {
 
 interface CandidateSet {
   mentors: RawRecord[]
-  programmes: RawRecord[]
+  initiatives: RawRecord[]
   partners: RawRecord[]
 }
 
@@ -41,7 +41,7 @@ function loadSeedData(): CandidateSet {
   const dir = join(process.cwd(), 'data')
   return {
     mentors: JSON.parse(readFileSync(join(dir, 'mentors.json'), 'utf8')),
-    programmes: JSON.parse(readFileSync(join(dir, 'programmes.json'), 'utf8')),
+    initiatives: JSON.parse(readFileSync(join(dir, 'programmes.json'), 'utf8')),
     partners: JSON.parse(readFileSync(join(dir, 'partners.json'), 'utf8')),
   }
 }
@@ -75,10 +75,10 @@ function candidateScore(startup: StartupForMatching, record: RawRecord): number 
   const needs = startup.needs.map(normalize)
   let score = 0
 
-  if (hasOverlap(record, ['industries', 'expertise', 'focus_industries', 'industries_interested', 'service_type', 'investment_thesis'], [industry])) score += 4
+  if (hasOverlap(record, ['industries', 'expertise', 'focus_industries', 'industries_interested', 'service_type', 'investment_thesis', 'description'], [industry])) score += 4
   if (arrayIncludes(record, 'startup_stage', stage) || arrayIncludes(record, 'suitable_for_stage', stage) || arrayIncludes(record, 'investment_stage', stage)) score += 3
   if (typeof record.eligibility === 'object' && record.eligibility && arrayIncludes(record.eligibility as RawRecord, 'stage', stage)) score += 3
-  if (hasOverlap(record, ['what_they_offer', 'benefits', 'background', 'investment_thesis'], needs)) score += 2
+  if (hasOverlap(record, ['what_they_offer', 'benefits', 'background', 'investment_thesis', 'description'], needs)) score += 2
 
   return score
 }
@@ -103,13 +103,14 @@ function storePartnersAsCandidates(): RawRecord[] {
   }))
 }
 
-function storeInitiativesAsProgrammes(): RawRecord[] {
+function storeInitiativesAsCandidates(): RawRecord[] {
   return store.getAllInitiatives().map(initiative => {
     const publicInitiative = docToInitiative(initiative)!
     return {
       id: publicInitiative.initiativeId,
       name: publicInitiative.name,
       type: publicInitiative.type,
+      description: publicInitiative.description,
       focus_industries: publicInitiative.focusIndustries,
       funding_amount: publicInitiative.fundingAmount,
       next_intake: publicInitiative.nextIntake,
@@ -135,7 +136,7 @@ function fetchCandidateSet(startup: StartupForMatching, trace: ToolTrace[]): Can
     ...seed.mentors,
     ...storePartnersAsCandidates().filter(partner => partner.partner_type === 'mentor'),
   ])
-  const programmes = dedupeById([...seed.programmes, ...storeInitiativesAsProgrammes()])
+  const initiatives = dedupeById([...seed.initiatives, ...storeInitiativesAsCandidates()])
   const partners = dedupeById([
     ...seed.partners,
     ...storePartnersAsCandidates().filter(partner => partner.partner_type !== 'mentor'),
@@ -144,12 +145,12 @@ function fetchCandidateSet(startup: StartupForMatching, trace: ToolTrace[]): Can
   const criteria = { industry: startup.industry, stage: startup.stage, needs: startup.needs }
   const filtered = {
     mentors: topCandidates(startup, mentors),
-    programmes: topCandidates(startup, programmes),
+    initiatives: topCandidates(startup, initiatives),
     partners: topCandidates(startup, partners, 12),
   }
 
   trace.push({ tool: 'fetch_mentors', input: criteria, resultCount: filtered.mentors.length })
-  trace.push({ tool: 'fetch_programmes_and_initiatives', input: criteria, resultCount: filtered.programmes.length })
+  trace.push({ tool: 'fetch_initiatives', input: criteria, resultCount: filtered.initiatives.length })
   trace.push({ tool: 'fetch_partners', input: criteria, resultCount: filtered.partners.length })
 
   return filtered
@@ -159,7 +160,7 @@ function toResults(items: unknown[]): MatchResult[] {
   return (items as RawRecord[]).map(item => ({
     actorId: item.actor_id as string,
     actorName: item.actor_name as string,
-    actorType: item.actor_type as MatchResult['actorType'],
+    actorType: (item.actor_type === 'programme' ? 'initiative' : item.actor_type) as MatchResult['actorType'],
     partnerType: (item.partner_type ?? null) as PartnerType | null,
     matchScore: item.match_score as number,
     matchReason: item.match_reason as string,
@@ -169,7 +170,7 @@ function toResults(items: unknown[]): MatchResult[] {
 function toMatchResponse(raw: Record<string, unknown[]>): MatchResponse {
   return {
     mentors: toResults(raw.mentors ?? []).slice(0, 3),
-    programmes: toResults(raw.programmes ?? []).slice(0, 3),
+    initiatives: toResults(raw.initiatives ?? raw.programmes ?? []).slice(0, 3),
     corporatePartners: toResults(raw.corporate_partners ?? []).slice(0, 3),
     investors: toResults(raw.investors ?? []).slice(0, 3),
     serviceProviders: toResults(raw.service_providers ?? []).slice(0, 3),
@@ -223,7 +224,7 @@ async function runMatching(startup: StartupForMatching, trace: ToolTrace[]): Pro
   })
 
   const candidates = fetchCandidateSet(startup, trace)
-  const prompt = buildMatchingPrompt(startup, candidates.mentors, candidates.programmes, candidates.partners)
+  const prompt = buildMatchingPrompt(startup, candidates.mentors, candidates.initiatives, candidates.partners)
   const model = getGeminiModel()
   const raw = await getMatches(model, prompt)
 

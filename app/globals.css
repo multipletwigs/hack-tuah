@@ -429,6 +429,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; b
 .result-card-row { display: flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.55rem; }
 .result-expand-btn { background: none; border: none; cursor: pointer; color: #94a3b8; font-size: 0.65rem; padding: 0; flex-shrink: 0; width: 14px; line-height: 1; }
 .result-card-name { flex: 1; font-size: 0.82rem; font-weight: 600; color: #1a1a2e; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.result-card-meta { display: block; margin-top: 0.1rem; font-size: 0.68rem; font-weight: 600; color: #64748b; text-transform: capitalize; }
 .result-link-btn { padding: 0.22rem 0.6rem !important; font-size: 0.72rem !important; border-radius: 5px !important; flex-shrink: 0; }
 .result-card-reason { padding: 0.35rem 0.55rem 0.5rem; font-size: 0.76rem; color: #475569; line-height: 1.5; border-top: 1px solid #f1f5f9; background: #fafbff; }
 .network-match-card {

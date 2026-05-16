@@ -16,11 +16,12 @@ export async function POST(request: NextRequest) {
   }
 
   const linkageId = generateLinkageId()
+  const normalizedActorType = actorType === 'programme' ? 'initiative' : actorType
   store.saveLinkage({
     linkage_id: linkageId,
     startup_id: startupId,
     startup_name: startupName,
-    actor_type: actorType,
+    actor_type: normalizedActorType,
     partner_type: partnerType ?? null,
     actor_id: actorId,
     actor_name: actorName,

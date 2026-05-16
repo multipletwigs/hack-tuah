@@ -26,7 +26,7 @@ export async function getMatches(model: ReturnType<GoogleGenerativeAI['getGenera
 
   const all = [
     ...(parsed.mentors ?? []),
-    ...(parsed.programmes ?? []),
+    ...(parsed.initiatives ?? parsed.programmes ?? []),
     ...(parsed.corporate_partners ?? []),
     ...(parsed.investors ?? []),
     ...(parsed.service_providers ?? []),

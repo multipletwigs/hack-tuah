@@ -72,7 +72,7 @@ const TOOL_DECLARATIONS: any[] = [
   },
   {
     name: 'search_initiatives',
-    description: 'Search programmes, grants, accelerators, and incubators. Filter by industry to reduce context size.',
+    description: 'Search initiatives such as programmes, grants, accelerators, incubators, and challenges. Filter by industry to reduce context size.',
     parameters: {
       type: 'object',
       properties: {
@@ -91,7 +91,7 @@ const TOOL_DECLARATIONS: any[] = [
         corporate_partners: { type: 'array', items: MATCH_ITEM, description: 'Top 3 corporate partner matches' },
         investors:          { type: 'array', items: MATCH_ITEM, description: 'Top 3 investor matches' },
         service_providers:  { type: 'array', items: MATCH_ITEM, description: 'Top 3 service provider matches' },
-        initiatives:        { type: 'array', items: MATCH_ITEM, description: 'Top 3 initiative/programme matches' },
+        initiatives:        { type: 'array', items: MATCH_ITEM, description: 'Top 3 initiative matches' },
       },
       required: ['mentors', 'corporate_partners', 'investors', 'service_providers', 'initiatives'],
     },
@@ -152,7 +152,7 @@ function toEntry(
 
 const SYSTEM_PROMPT = `You are an intelligent startup ecosystem matching agent for Cradle, Malaysia's startup development fund.
 
-Your task: find the top 3 best-fit ecosystem actors for a given startup across 5 categories — mentors, corporate partners, investors, service providers, and initiatives/programmes.
+Your task: find the top 3 best-fit ecosystem actors for a given startup across 5 categories — mentors, corporate partners, investors, service providers, and initiatives.
 
 Workflow:
 1. Call get_startup_profile to understand the startup's industry, stage, problem, and needs
@@ -237,7 +237,7 @@ export async function runActorMatching(actorId: string, actorType: 'partner' | '
     const doc = store.getInitiative(actorId)
     if (!doc) throw new Error(`Initiative '${actorId}' not found`)
     const init = docToInitiative(doc)!
-    actorProfile = `Type: initiative / ${init.type}\nName: ${init.name}\nFocus Industries: ${init.focusIndustries.join(', ')}\nStatus: ${init.status}`
+    actorProfile = `Type: initiative / ${init.type}\nName: ${init.name}\nDescription: ${init.description}\nFocus Industries: ${init.focusIndustries.join(', ')}\nStatus: ${init.status}`
   }
 
   const startupList = store.getAllStartups().map(s =>

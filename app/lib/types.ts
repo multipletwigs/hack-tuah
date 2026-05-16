@@ -1,9 +1,10 @@
-export type ActorType = 'mentor' | 'programme' | 'partner'
+export type ActorType = 'mentor' | 'initiative' | 'partner' | 'programme'
 
 export interface Initiative {
   initiativeId: string
   name: string
   type: 'accelerator' | 'grant' | 'incubator' | 'programme' | 'challenge'
+  description: string
   focusIndustries: string[]
   fundingAmount: number | null
   nextIntake: string | null
@@ -43,7 +44,7 @@ export interface MatchResult {
 
 export interface MatchResponse {
   mentors: MatchResult[]
-  programmes: MatchResult[]
+  initiatives: MatchResult[]
   corporatePartners: MatchResult[]
   investors: MatchResult[]
   serviceProviders: MatchResult[]

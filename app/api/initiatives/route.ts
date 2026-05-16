@@ -7,7 +7,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const body = await request.json()
-  const { name, type, focusIndustries, fundingAmount, nextIntake, status } = body
+  const { name, type, description, focusIndustries, fundingAmount, nextIntake, status } = body
 
   if (!name || !type) {
     return Response.json({ error: 'Missing required fields' }, { status: 422 })
@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
     initiative_id: initiativeId,
     name,
     type,
+    description: description ?? '',
     focus_industries: focusIndustries ?? [],
     funding_amount: fundingAmount ?? null,
     next_intake: nextIntake ?? null,

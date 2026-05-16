@@ -25,6 +25,7 @@ interface InitiativeRow {
   initiativeId: string
   name: string
   type: string
+  description: string
 }
 
 interface LinkageRow {
@@ -71,10 +72,11 @@ function allMatchEntries(result: AgentMatchResult | null): MatchEntry[] {
   ])
 }
 
-function ResultCard({ entry, confirmed, onConfirm }: {
+function ResultCard({ entry, confirmed, onConfirm, meta }: {
   entry: MatchEntry
   confirmed: boolean
   onConfirm: (e: MatchEntry) => Promise<void>
+  meta?: string
 }) {
   const [expanded, setExpanded] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -82,7 +84,10 @@ function ResultCard({ entry, confirmed, onConfirm }: {
     <div className={`result-card${confirmed ? ' result-card-confirmed' : ''}`}>
       <div className="result-card-row">
         <button className="result-expand-btn" onClick={() => setExpanded(v => !v)}>{expanded ? '▾' : '▸'}</button>
-        <span className="result-card-name">{entry.actorName}</span>
+        <span className="result-card-name">
+          {entry.actorName}
+          {meta && <span className="result-card-meta">{meta}</span>}
+        </span>
         <span className={`score-badge ${scoreClass(entry.matchScore)}`}>{entry.matchScore}%</span>
         <button
           className={`btn result-link-btn${confirmed ? ' btn-confirmed' : ' btn-primary'}`}
@@ -97,12 +102,13 @@ function ResultCard({ entry, confirmed, onConfirm }: {
   )
 }
 
-function ResultSection({ title, entries, topK, confirmed, onConfirm }: {
+function ResultSection({ title, entries, topK, confirmed, onConfirm, getMeta }: {
   title: string
   entries: MatchEntry[]
   topK: number
   confirmed: Set<string>
   onConfirm: (e: MatchEntry) => Promise<void>
+  getMeta?: (e: MatchEntry) => string | undefined
 }) {
   const [open, setOpen] = useState(true)
   const shown = entries.slice(0, topK)
@@ -114,7 +120,7 @@ function ResultSection({ title, entries, topK, confirmed, onConfirm }: {
         <span className="count-badge">{shown.length}</span>
       </button>
       {open && shown.map(e => (
-        <ResultCard key={e.actorId} entry={e} confirmed={confirmed.has(e.actorId)} onConfirm={onConfirm} />
+        <ResultCard key={e.actorId} entry={e} confirmed={confirmed.has(e.actorId)} onConfirm={onConfirm} meta={getMeta?.(e)} />
       ))}
     </div>
   )
@@ -307,7 +313,10 @@ export default function MatchesPage() {
   const [selectedId,   setSelectedId]   = useState('')
   const [selectedKind, setSelectedKind] = useState<GraphNodeKind>('matcher')
   const [selectedNodeId, setSelectedNodeId] = useState('matcher')
-  const [topK, setTopK] = useState(3)
+  const [topK, setTopK] = useState(() => {
+    const v = Number(process.env.NEXT_PUBLIC_DEFAULT_TOP_K)
+    return v >= 1 && v <= 5 ? v : 3
+  })
   // const [query, setQuery] = useState('')
   // const [messages, setMessages] = useState<{ role: string; text: string }[]>([])
   // const [reportTab, setReportTab] = useState<ReportTab>('partners')
@@ -368,7 +377,7 @@ export default function MatchesPage() {
       const startup = startups.find(s => s.startup_id === selectedId)
       body = {
         startupId: selectedId, startupName: startup?.startup_name ?? '',
-        actorType: entry.actorType === 'initiative' ? 'programme' : entry.actorType,
+        actorType: entry.actorType,
         partnerType: entry.partnerType,
         actorId: entry.actorId, actorName: entry.actorName,
         matchScore: entry.matchScore, matchReason: entry.matchReason,
@@ -377,7 +386,7 @@ export default function MatchesPage() {
       const startup = startups.find(s => s.startup_id === entry.actorId)
       body = {
         startupId: entry.actorId, startupName: startup?.startup_name ?? entry.actorName,
-        actorType: selectedKind === 'initiative' ? 'programme' : 'partner',
+        actorType: selectedKind === 'initiative' ? 'initiative' : 'partner',
         partnerType: selectedKind === 'investor' ? 'investor' : selectedKind === 'service' ? 'service_provider' : selectedKind === 'mentor' ? null : 'corporate',
         actorId: selectedId, actorName: selectedActorName,
         matchScore: entry.matchScore, matchReason: entry.matchReason,
@@ -399,7 +408,7 @@ export default function MatchesPage() {
         { label: 'Corporate Partners',entries: result?.corporatePartners ?? [] },
         { label: 'Investors',         entries: result?.investors         ?? [] },
         { label: 'Service Providers', entries: result?.serviceProviders  ?? [] },
-        { label: 'Initiatives',       entries: result?.initiatives       ?? [] },
+        { label: 'Initiatives',       entries: result?.initiatives       ?? [], getMeta: (entry: MatchEntry) => initiatives.find(i => i.initiativeId === entry.actorId)?.type },
       ].filter(s => s.entries.length > 0)
     : result?.startups.length
       ? [{ label: 'Matching Startups', entries: result.startups }]
@@ -442,8 +451,12 @@ export default function MatchesPage() {
                     {selectedKind}
                     {selectedStartup ? ` · ${selectedStartup.industry} · ${selectedStartup.stage}` : ''}
                     {selectedPartner ? ` · ${selectedPartner.industry}` : ''}
+                    {selectedInitiative ? ` · ${selectedInitiative.type}` : ''}
                   </span>
                 </div>
+                {selectedInitiative?.description && (
+                  <p className="node-subtitle" style={{ marginBottom: '0.75rem' }}>{selectedInitiative.description}</p>
+                )}
                 {selectedStartup?.needs && selectedStartup.needs.length > 0 && (
                   <div className="needs-chips">
                     {selectedStartup.needs.map(n => <span key={n} className="need-chip">{n}</span>)}
@@ -498,6 +511,7 @@ export default function MatchesPage() {
                 topK={topK}
                 confirmed={confirmed}
                 onConfirm={confirmLinkage}
+                getMeta={'getMeta' in section ? section.getMeta : undefined}
               />
             ))}
           </section>

@@ -3,6 +3,7 @@
     "id": "programme_001",
     "name": "CIP Accelerate",
     "type": "accelerator",
+    "description": "Seed-stage accelerator with funding, mentorship, lab access, and investor introductions.",
     "focus_industries": ["fintech", "healthtech", "edtech", "agritech"],
     "eligibility": {
       "stage": ["seed"],
@@ -18,6 +19,7 @@
     "id": "programme_002",
     "name": "GAIN Grant",
     "type": "grant",
+    "description": "Non-dilutive commercialisation grant for early Malaysian startups with quarterly Cradle reviews.",
     "focus_industries": ["fintech", "saas", "deep tech"],
     "eligibility": {
       "stage": ["pre-seed", "seed"],
@@ -33,6 +35,7 @@
     "id": "programme_003",
     "name": "Tech Startup Catalyst",
     "type": "incubator",
+    "description": "Six-month incubator for technical mentorship, market access workshops, and demo day readiness.",
     "focus_industries": ["saas", "edtech", "HR tech", "healthtech"],
     "eligibility": {
       "stage": ["pre-seed", "seed", "series-a"],

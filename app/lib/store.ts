@@ -45,6 +45,7 @@ interface InitiativeDoc {
   initiative_id: string
   name: string
   type: string
+  description: string
   focus_industries: string[]
   funding_amount: number | null
   next_intake: string | null
@@ -82,9 +83,9 @@ function defaultPartners(): Record<string, PartnerDoc> {
 function defaultInitiatives(): Record<string, InitiativeDoc> {
   const now = new Date().toISOString()
   const rows: InitiativeDoc[] = [
-    { initiative_id: 'init_001', name: 'CIP Accelerate',        type: 'accelerator', focus_industries: ['fintech','healthtech','edtech','agritech'], funding_amount: 500000, next_intake: 'Q3 2026', status: 'active',   created_at: now },
-    { initiative_id: 'init_002', name: 'GAIN Grant',             type: 'grant',       focus_industries: ['fintech','saas','deep tech'],              funding_amount: 150000, next_intake: 'Q2 2026', status: 'active',   created_at: now },
-    { initiative_id: 'init_003', name: 'Tech Startup Catalyst', type: 'incubator',   focus_industries: ['saas','edtech','healthtech'],              funding_amount: 250000, next_intake: 'Q4 2026', status: 'active',   created_at: now },
+    { initiative_id: 'init_001', name: 'CIP Accelerate',        type: 'accelerator', description: 'Seed-stage accelerator with funding, mentorship, lab access, and investor introductions.', focus_industries: ['fintech','healthtech','edtech','agritech'], funding_amount: 500000, next_intake: 'Q3 2026', status: 'active',   created_at: now },
+    { initiative_id: 'init_002', name: 'GAIN Grant',             type: 'grant',       description: 'Non-dilutive commercialisation grant for early Malaysian startups with quarterly Cradle reviews.', focus_industries: ['fintech','saas','deep tech'],              funding_amount: 150000, next_intake: 'Q2 2026', status: 'active',   created_at: now },
+    { initiative_id: 'init_003', name: 'Tech Startup Catalyst', type: 'incubator',   description: 'Six-month incubator for technical mentorship, market access workshops, and demo day readiness.', focus_industries: ['saas','edtech','healthtech'],              funding_amount: 250000, next_intake: 'Q4 2026', status: 'active',   created_at: now },
   ]
   return Object.fromEntries(rows.map(r => [r.initiative_id, r]))
 }
@@ -208,6 +209,7 @@ export function docToInitiative(doc: ReturnType<InMemoryStore['getInitiative']>)
     initiativeId: doc.initiative_id,
     name: doc.name,
     type: doc.type as Initiative['type'],
+    description: doc.description ?? '',
     focusIndustries: doc.focus_industries,
     fundingAmount: doc.funding_amount,
     nextIntake: doc.next_intake,

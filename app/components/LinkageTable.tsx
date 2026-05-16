@@ -13,8 +13,13 @@ function scoreClass(score: number) {
 
 function actorTagClass(t: ActorType) {
   if (t === 'mentor') return 'tag-mentor'
-  if (t === 'programme') return 'tag-programme'
+  if (t === 'initiative' || t === 'programme') return 'tag-programme'
   return 'tag-corporate'
+}
+
+function actorLabel(t: ActorType) {
+  if (t === 'programme') return 'Initiative'
+  return t.charAt(0).toUpperCase() + t.slice(1)
 }
 
 function partnerTagClass(t: PartnerType) {
@@ -46,7 +51,7 @@ export default function LinkageTable({ linkages }: Props) {
               <td>{row.startupName}</td>
               <td>
                 <span className={`actor-tag ${actorTagClass(row.actorType)}`}>
-                  {row.actorType.charAt(0).toUpperCase() + row.actorType.slice(1)}
+                  {actorLabel(row.actorType)}
                 </span>
               </td>
               <td>

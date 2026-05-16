@@ -36,7 +36,7 @@ The proposed `/admin/matches` page becomes a four-zone workspace:
 
 4. Report tabs
    - Keeps the existing top-3 category model from the current matching page.
-   - Tabs group `Partners`, `Programs`, and `Initiatives`.
+   - Results group `Partners`, `Mentors`, and `Initiatives`.
    - Each recommendation has score, mutual-fit rationale, and `Confirm Linkage`.
 
 ## Implementation Notes
