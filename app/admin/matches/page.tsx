@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import Toast, { showToast } from '@/app/components/Toast'
 import LoadingOverlay from '@/app/components/LoadingOverlay'
-import type { AgentMatchResult, MatchEntry, AgentStep } from '@/app/lib/matching-agent'
+import type { AgentMatchResult, MatchEntry } from '@/app/lib/matching-agent'
 
 interface StartupRow {
   startup_id: string
@@ -32,7 +32,6 @@ interface LinkageRow {
   actorId: string
 }
 
-type ReportTab = 'startups' | 'partners' | 'programs' | 'initiatives' | 'trace'
 type GraphNodeKind = 'startup' | 'matcher' | 'mentor' | 'partner' | 'investor' | 'service' | 'initiative'
 
 interface GraphNode {
@@ -44,29 +43,6 @@ interface GraphNode {
   x: number
   y: number
   r: number
-}
-
-const TOOL_LABELS: Record<string, string> = {
-  get_startup_profile: 'Fetched startup profile',
-  search_partners: 'Searched partners',
-  search_mentors: 'Searched mentors',
-  search_initiatives: 'Searched initiatives',
-}
-
-const SAMPLE_QUERY = 'Who are the startups that are not matched yet in the agriculture sector?'
-
-function actorKind(entry: MatchEntry): GraphNodeKind {
-  if (entry.actorType === 'mentor') return 'mentor'
-  if (entry.actorType === 'initiative') return 'initiative'
-  if (entry.partnerType === 'investor') return 'investor'
-  if (entry.partnerType === 'service_provider') return 'service'
-  return 'partner'
-}
-
-function actorLabel(entry: MatchEntry): string {
-  if (entry.actorType === 'initiative') return 'initiative'
-  if (entry.actorType === 'mentor') return 'mentor'
-  return entry.partnerType?.replace('_', ' ') ?? 'partner'
 }
 
 function scoreClass(score: number): string {
@@ -95,86 +71,52 @@ function allMatchEntries(result: AgentMatchResult | null): MatchEntry[] {
   ])
 }
 
-function findStartupForQuery(query: string, startups: StartupRow[], linkedStartupIds: Set<string>): StartupRow | null {
-  const text = query.toLowerCase()
-  const wantsUnmatched = text.includes('not matched') || text.includes('unmatched')
-  const agricultureQuery = text.includes('agriculture') || text.includes('agri')
-
-  const candidates = startups.filter(startup => {
-    if (wantsUnmatched && linkedStartupIds.has(startup.startup_id)) return false
-    if (agricultureQuery) {
-      const industry = startup.industry.toLowerCase()
-      return industry.includes('agri') || industry.includes('farm') || industry.includes('agriculture')
-    }
-    return true
-  })
-
-  const exact = candidates.find(startup =>
-    text.includes(startup.startup_name.toLowerCase()) || text.includes(startup.startup_id.toLowerCase()),
-  )
-  return exact ?? candidates[0] ?? null
-}
-
-function entriesForTab(result: AgentMatchResult | null, tab: ReportTab): MatchEntry[] {
-  if (!result) return []
-  if (tab === 'startups')    return result.startups
-  if (tab === 'partners')    return [...result.corporatePartners, ...result.investors, ...result.serviceProviders]
-  if (tab === 'programs')    return result.mentors
-  if (tab === 'initiatives') return result.initiatives
-  return []
-}
-
-function AgentTrace({ steps }: { steps: AgentStep[] }) {
-  const [expanded, setExpanded] = useState<number | null>(null)
-  if (steps.length === 0) return <div className="network-empty">No tool calls yet.</div>
-
+function ResultCard({ entry, confirmed, onConfirm }: {
+  entry: MatchEntry
+  confirmed: boolean
+  onConfirm: (e: MatchEntry) => Promise<void>
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [busy, setBusy] = useState(false)
   return (
-    <div className="agent-trace-list">
-      {steps.map((step, i) => (
-        <div key={i} className="agent-trace-item">
-          <button className="agent-trace-button" onClick={() => setExpanded(expanded === i ? null : i)}>
-            <span>{TOOL_LABELS[step.tool] ?? step.tool}</span>
-            <span>{expanded === i ? 'Collapse' : 'View'}</span>
-          </button>
-          {expanded === i && (
-            <pre className="agent-trace-json">{JSON.stringify(step.result, null, 2)}</pre>
-          )}
-        </div>
-      ))}
+    <div className={`result-card${confirmed ? ' result-card-confirmed' : ''}`}>
+      <div className="result-card-row">
+        <button className="result-expand-btn" onClick={() => setExpanded(v => !v)}>{expanded ? '▾' : '▸'}</button>
+        <span className="result-card-name">{entry.actorName}</span>
+        <span className={`score-badge ${scoreClass(entry.matchScore)}`}>{entry.matchScore}%</span>
+        <button
+          className={`btn result-link-btn${confirmed ? ' btn-confirmed' : ' btn-primary'}`}
+          disabled={confirmed || busy}
+          onClick={async () => { setBusy(true); try { await onConfirm(entry) } finally { setBusy(false) } }}
+        >
+          {confirmed ? '✓' : busy ? '…' : 'Link'}
+        </button>
+      </div>
+      {expanded && <p className="result-card-reason">{entry.matchReason}</p>}
     </div>
   )
 }
 
-function MatchCard({ entry, confirmed, onConfirm }: {
-  entry: MatchEntry
-  confirmed: boolean
-  onConfirm: () => Promise<void>
+function ResultSection({ title, entries, topK, confirmed, onConfirm }: {
+  title: string
+  entries: MatchEntry[]
+  topK: number
+  confirmed: Set<string>
+  onConfirm: (e: MatchEntry) => Promise<void>
 }) {
-  const [busy, setBusy] = useState(false)
-
-  async function handleConfirm() {
-    setBusy(true)
-    try { await onConfirm() } finally { setBusy(false) }
-  }
-
+  const [open, setOpen] = useState(true)
+  const shown = entries.slice(0, topK)
+  if (shown.length === 0) return null
   return (
-    <article className="network-match-card">
-      <div className="card-header">
-        <div>
-          <span className="card-name">{entry.actorName}</span>
-          <span className={`actor-tag network-actor-tag actor-${actorKind(entry)}`}>{actorLabel(entry)}</span>
-        </div>
-        <span className={`score-badge ${scoreClass(entry.matchScore)}`}>{entry.matchScore}%</span>
-      </div>
-      <p className="match-reason">{entry.matchReason}</p>
-      <button
-        className={`btn btn-primary${confirmed ? ' btn-confirmed' : ''}`}
-        onClick={handleConfirm}
-        disabled={confirmed || busy}
-      >
-        {confirmed ? 'Confirmed' : busy ? 'Saving...' : 'Confirm Linkage'}
+    <div className="result-section">
+      <button className="result-section-head" onClick={() => setOpen(o => !o)}>
+        <span>{open ? '▾' : '▸'} {title}</span>
+        <span className="count-badge">{shown.length}</span>
       </button>
-    </article>
+      {open && shown.map(e => (
+        <ResultCard key={e.actorId} entry={e} confirmed={confirmed.has(e.actorId)} onConfirm={onConfirm} />
+      ))}
+    </div>
   )
 }
 
@@ -365,11 +307,10 @@ export default function MatchesPage() {
   const [selectedId,   setSelectedId]   = useState('')
   const [selectedKind, setSelectedKind] = useState<GraphNodeKind>('matcher')
   const [selectedNodeId, setSelectedNodeId] = useState('matcher')
-  const [query, setQuery] = useState(SAMPLE_QUERY)
-  const [messages, setMessages] = useState([
-    { role: 'agent', text: 'Click any actor node to run matching. Startups find partners & initiatives; partners & mentors find matching startups.' },
-  ])
-  const [reportTab, setReportTab] = useState<ReportTab>('partners')
+  const [topK, setTopK] = useState(3)
+  // const [query, setQuery] = useState('')
+  // const [messages, setMessages] = useState<{ role: string; text: string }[]>([])
+  // const [reportTab, setReportTab] = useState<ReportTab>('partners')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<AgentMatchResult | null>(null)
   const [confirmed, setConfirmed] = useState<Set<string>>(new Set())
@@ -383,18 +324,14 @@ export default function MatchesPage() {
   }, [])
 
   const linkedStartupIds = useMemo(() => new Set(linkages.map(l => l.startupId)), [linkages])
-  const selectedStartup  = selectedKind === 'startup' ? startups.find(s => s.startup_id === selectedId) : undefined
-  const selectedPartner  = (selectedKind !== 'startup' && selectedKind !== 'matcher' && selectedKind !== 'initiative')
+  const selectedStartup    = selectedKind === 'startup'    ? startups.find(s => s.startup_id === selectedId)  : undefined
+  const selectedPartner    = (selectedKind !== 'startup' && selectedKind !== 'matcher' && selectedKind !== 'initiative')
     ? partners.find(p => p.partnerId === selectedId) : undefined
   const selectedInitiative = selectedKind === 'initiative' ? initiatives.find(i => i.initiativeId === selectedId) : undefined
-  const selectedEntry    = allMatchEntries(result).find(e => e.actorId === selectedNodeId)
-    ?? result?.startups.find(e => e.actorId === selectedNodeId)
-  const reportEntries    = entriesForTab(result, reportTab)
+  const selectedActorName  = selectedStartup?.startup_name ?? selectedPartner?.orgName ?? selectedInitiative?.name ?? ''
+  const fromStartup        = result?.direction === 'from-startup'
 
-  const selectedActorName = selectedStartup?.startup_name ?? selectedPartner?.orgName ?? selectedInitiative?.name ?? ''
-  const fromStartup = result?.direction === 'from-startup'
-
-  async function generate(id: string, kind: GraphNodeKind, source = 'node click') {
+  async function generate(id: string, kind: GraphNodeKind) {
     if (!id || id === 'matcher') return
     setSelectedId(id)
     setSelectedKind(kind)
@@ -403,35 +340,17 @@ export default function MatchesPage() {
     setResult(null)
     setConfirmed(new Set())
     setError(null)
-
     try {
       const isStartup = kind === 'startup'
-      const actorType = kind === 'initiative' ? 'initiative' : 'partner'
       const body = isStartup
         ? { startupId: id }
-        : { actorId: id, actorType }
-
+        : { actorId: id, actorType: kind === 'initiative' ? 'initiative' : 'partner' }
       const res = await fetch('/api/agent/match', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       })
-      if (!res.ok) throw new Error((await res.json()).error ?? 'Match generation failed')
-      const nextResult: AgentMatchResult = await res.json()
-      setResult(nextResult)
-      setReportTab(isStartup ? 'partners' : 'startups')
+      if (!res.ok) throw new Error((await res.json()).error ?? 'Match failed')
+      setResult(await res.json())
       setSelectedNodeId('matcher')
-
-      const name = isStartup
-        ? startups.find(s => s.startup_id === id)?.startup_name
-        : partners.find(p => p.partnerId === id)?.orgName ?? initiatives.find(i => i.initiativeId === id)?.name
-      const total = isStartup
-        ? allMatchEntries(nextResult).length
-        : nextResult.startups.length
-      setMessages(prev => [...prev, {
-        role: 'agent',
-        text: `Found ${total} match${total !== 1 ? 'es' : ''} for ${name ?? id} (${source}).`,
-      }])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate matches')
     } finally {
@@ -439,90 +358,61 @@ export default function MatchesPage() {
     }
   }
 
-  async function submitQuery() {
-    const text = query.trim()
-    if (!text) return
-    setMessages(prev => [...prev, { role: 'user', text }])
-    const startup = findStartupForQuery(text, startups, linkedStartupIds)
-    if (!startup) {
-      setMessages(prev => [...prev, { role: 'agent', text: 'No startup matched. Try a name, industry, or stage.' }])
-      return
-    }
-    setMessages(prev => [...prev, { role: 'agent', text: `Found ${startup.startup_name}. Running through Matcher…` }])
-    await generate(startup.startup_id, 'startup', 'chat query')
-  }
+  /* chat — temporarily disabled
+  async function submitQuery() { ... }
+  */
 
   async function confirmLinkage(entry: MatchEntry) {
     let body: Record<string, unknown>
-
     if (fromStartup) {
-      // startup → actor direction
       const startup = startups.find(s => s.startup_id === selectedId)
       body = {
-        startupId:   selectedId,
-        startupName: startup?.startup_name ?? '',
-        actorType:   entry.actorType === 'initiative' ? 'programme' : entry.actorType,
+        startupId: selectedId, startupName: startup?.startup_name ?? '',
+        actorType: entry.actorType === 'initiative' ? 'programme' : entry.actorType,
         partnerType: entry.partnerType,
-        actorId:     entry.actorId,
-        actorName:   entry.actorName,
-        matchScore:  entry.matchScore,
-        matchReason: entry.matchReason,
+        actorId: entry.actorId, actorName: entry.actorName,
+        matchScore: entry.matchScore, matchReason: entry.matchReason,
       }
     } else {
-      // actor → startup direction: entry is a matched startup
       const startup = startups.find(s => s.startup_id === entry.actorId)
-      const actorType = selectedKind === 'initiative' ? 'programme' : 'partner'
-      const partnerType = selectedKind === 'investor' ? 'investor'
-        : selectedKind === 'service' ? 'service_provider'
-        : selectedKind === 'mentor'  ? null
-        : 'corporate'
       body = {
-        startupId:   entry.actorId,
-        startupName: startup?.startup_name ?? entry.actorName,
-        actorType,
-        partnerType,
-        actorId:     selectedId,
-        actorName:   selectedActorName,
-        matchScore:  entry.matchScore,
-        matchReason: entry.matchReason,
+        startupId: entry.actorId, startupName: startup?.startup_name ?? entry.actorName,
+        actorType: selectedKind === 'initiative' ? 'programme' : 'partner',
+        partnerType: selectedKind === 'investor' ? 'investor' : selectedKind === 'service' ? 'service_provider' : selectedKind === 'mentor' ? null : 'corporate',
+        actorId: selectedId, actorName: selectedActorName,
+        matchScore: entry.matchScore, matchReason: entry.matchReason,
       }
     }
-
     const res = await fetch('/api/linkages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     })
     if (!res.ok) throw new Error((await res.json()).error)
     setConfirmed(prev => new Set([...prev, entry.actorId]))
     const linkedStartupId = fromStartup ? selectedId : entry.actorId
     setLinkages(prev => [...prev, { startupId: linkedStartupId, actorId: fromStartup ? entry.actorId : selectedId }])
-    showToast(`Linkage confirmed: ${entry.actorName}`)
+    showToast(`Linked: ${entry.actorName}`)
   }
 
-  const reportSubtitle = selectedActorName
-    ? fromStartup
-      ? `Top ecosystem matches for ${selectedActorName}`
-      : `Matching startups for ${selectedActorName}`
-    : 'Click any actor node to generate matches.'
+  const resultSections = fromStartup
+    ? [
+        { label: 'Mentors',           entries: result?.mentors           ?? [] },
+        { label: 'Corporate Partners',entries: result?.corporatePartners ?? [] },
+        { label: 'Investors',         entries: result?.investors         ?? [] },
+        { label: 'Service Providers', entries: result?.serviceProviders  ?? [] },
+        { label: 'Initiatives',       entries: result?.initiatives       ?? [] },
+      ].filter(s => s.entries.length > 0)
+    : result?.startups.length
+      ? [{ label: 'Matching Startups', entries: result.startups }]
+      : []
 
   return (
     <div className="admin-content matching-network-page">
-      <div className="matching-page-header">
-        <div>
-          <h1 className="page-title">Matching Engine</h1>
-          <p className="page-subtitle">
-            Click any actor node to run matching. Startups find partners &amp; initiatives; partners, mentors, and initiatives find matching startups.
-          </p>
-        </div>
-      </div>
-
       <div className="matching-workspace">
         <section className="section-card matching-graph-card">
           <div className="section-card-header">
             <span className="section-card-title">Ecosystem Network</span>
-            <span className="page-subtitle" style={{ margin: 0, fontSize: '0.8rem' }}>
-              {loading ? '⏳ Matching…' : selectedActorName ? `Selected: ${selectedActorName}` : 'Click a group to expand, then click an actor'}
+            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+              {loading ? '⏳ Matching…' : selectedActorName ? `Selected: ${selectedActorName}` : 'Expand a group → click an actor to match'}
             </span>
           </div>
           <EcosystemGraph
@@ -542,97 +432,77 @@ export default function MatchesPage() {
         </section>
 
         <aside className="matching-rail">
-          <section className="section-card matching-chat-card">
-            <div className="section-card-header">
-              <span className="section-card-title">Agent Chat</span>
-              <span className="actor-tag">ReAct</span>
-            </div>
-            <div className="chat-log">
-              {messages.map((message, index) => (
-                <div key={index} className={`chat-message ${message.role}`}>{message.text}</div>
-              ))}
-            </div>
-            <div className="chat-input-row">
-              <textarea value={query} onChange={e => setQuery(e.target.value)} />
-              <button className="btn btn-primary" onClick={submitQuery} disabled={loading}>Send</button>
-            </div>
+          {/* Node inspector */}
+          <section className="section-card" style={{ padding: '1rem 1.25rem' }}>
+            {selectedActorName ? (
+              <>
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <span className="result-actor-name">{selectedActorName}</span>
+                  <span className="result-actor-meta">
+                    {selectedKind}
+                    {selectedStartup ? ` · ${selectedStartup.industry} · ${selectedStartup.stage}` : ''}
+                    {selectedPartner ? ` · ${selectedPartner.industry}` : ''}
+                  </span>
+                </div>
+                {selectedStartup?.needs && selectedStartup.needs.length > 0 && (
+                  <div className="needs-chips">
+                    {selectedStartup.needs.map(n => <span key={n} className="need-chip">{n}</span>)}
+                  </div>
+                )}
+                {selectedStartup && linkedStartupIds.has(selectedId) && (
+                  <span className="status-badge status-active" style={{ marginTop: '0.5rem', display: 'inline-block' }}>Has linkages</span>
+                )}
+              </>
+            ) : (
+              <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                Expand a group node, then click any actor to run matching.
+              </p>
+            )}
           </section>
 
-          <section className="section-card node-inspector-card">
-            <div className="section-card-header">
-              <span className="section-card-title">Selected Node</span>
+          {/* Results panel */}
+          <section className="section-card result-panel">
+            <div className="result-panel-header">
+              <span className="section-card-title">
+                {result ? (fromStartup ? 'Ecosystem Matches' : 'Matching Startups') : 'Match Results'}
+              </span>
+              {result && (
+                <div className="topk-bar">
+                  <span>Top K</span>
+                  <div className="topk-controls">
+                    <button className="topk-btn" onClick={() => setTopK(k => Math.max(1, k - 1))}>−</button>
+                    <span className="topk-val">{topK}</span>
+                    <button className="topk-btn" onClick={() => setTopK(k => Math.min(5, k + 1))}>+</button>
+                  </div>
+                </div>
+              )}
             </div>
-            <h2 className="node-title">
-              {selectedEntry?.actorName ?? (selectedActorName || 'Matcher')}
-            </h2>
-            <p className="node-subtitle">
-              {selectedEntry?.matchReason ?? selectedStartup?.problem ?? 'Central agent node for filtering, ranking, and submitting ecosystem matches.'}
-            </p>
-            <div className="node-detail-grid">
-              <div><span>Type</span><strong>{selectedEntry ? actorLabel(selectedEntry) : selectedKind}</strong></div>
-              <div><span>Status</span><strong>{selectedStartup && linkedStartupIds.has(selectedId) ? 'matched' : 'open'}</strong></div>
-              <div><span>Industry</span><strong>{selectedStartup?.industry ?? selectedPartner?.industry ?? '—'}</strong></div>
-              <div><span>Stage</span><strong>{selectedStartup?.stage ?? '—'}</strong></div>
-            </div>
-            {selectedStartup?.needs && selectedStartup.needs.length > 0 && (
-              <div className="needs-chips">
-                {selectedStartup.needs.map(need => <span key={need} className="need-chip">{need}</span>)}
-              </div>
+
+            {!result && !loading && (
+              <p className="network-empty" style={{ padding: '1.5rem 0' }}>
+                Click an actor node in the graph to generate matches.
+              </p>
             )}
+            {loading && (
+              <p className="network-empty" style={{ padding: '1.5rem 0', color: '#4f6ef7' }}>
+                Agent is thinking…
+              </p>
+            )}
+            {error && <p style={{ color: '#dc2626', fontSize: '0.85rem', marginBottom: '0.75rem' }}>{error}</p>}
+
+            {resultSections.map(section => (
+              <ResultSection
+                key={section.label}
+                title={section.label}
+                entries={section.entries}
+                topK={topK}
+                confirmed={confirmed}
+                onConfirm={confirmLinkage}
+              />
+            ))}
           </section>
         </aside>
       </div>
-
-      {error && (
-        <div className="section-card network-error">
-          <p>{error}</p>
-        </div>
-      )}
-
-      <section className="section-card matching-report-card">
-        <div className="section-card-header">
-          <div>
-            <span className="section-card-title">Matching Report</span>
-            <p className="page-subtitle">{reportSubtitle}</p>
-          </div>
-        </div>
-        <div className="report-layout">
-          <div className="report-tabs">
-            {!fromStartup && (
-              <button className={`report-tab${reportTab === 'startups' ? ' active' : ''}`} onClick={() => setReportTab('startups')}>Startups</button>
-            )}
-            {fromStartup && (
-              <>
-                <button className={`report-tab${reportTab === 'partners' ? ' active' : ''}`} onClick={() => setReportTab('partners')}>Partners</button>
-                <button className={`report-tab${reportTab === 'programs' ? ' active' : ''}`} onClick={() => setReportTab('programs')}>Mentors</button>
-                <button className={`report-tab${reportTab === 'initiatives' ? ' active' : ''}`} onClick={() => setReportTab('initiatives')}>Initiatives</button>
-              </>
-            )}
-            <button className={`report-tab${reportTab === 'trace' ? ' active' : ''}`} onClick={() => setReportTab('trace')}>Trace</button>
-          </div>
-
-          <div className="report-panel">
-            {reportTab === 'trace' ? (
-              <AgentTrace steps={result?.steps ?? []} />
-            ) : reportEntries.length > 0 ? (
-              <div className="report-match-grid">
-                {reportEntries.map(entry => (
-                  <MatchCard
-                    key={entry.actorId}
-                    entry={entry}
-                    confirmed={confirmed.has(entry.actorId)}
-                    onConfirm={() => confirmLinkage(entry)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="network-empty">
-                {loading ? 'Agent is thinking…' : 'Click an actor node to generate matches.'}
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
 
       <LoadingOverlay visible={loading} message="Agent is thinking..." sub="Fetching and filtering ecosystem actors" />
       <Toast />

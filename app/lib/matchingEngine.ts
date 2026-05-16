@@ -227,7 +227,7 @@ async function runMatching(startup: StartupForMatching, trace: ToolTrace[]): Pro
   const model = getGeminiModel()
   const raw = await getMatches(model, prompt)
 
-  trace.push({ tool: 'rank_matches_with_llm', input: { model: 'gemini-1.5-flash' } })
+  trace.push({ tool: 'rank_matches_with_llm', input: { model: 'gemini-2.0-flash' } })
   return { startup, matches: toMatchResponse(raw), trace }
 }
 

@@ -411,15 +411,26 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; b
   text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.12rem;
 }
 .node-detail-grid strong { display: block; font-size: 0.88rem; color: #1a1a2e; }
-.matching-report-card { margin-bottom: 2rem; }
-.report-layout { display: grid; grid-template-columns: 190px 1fr; gap: 1rem; }
-.report-tabs { display: flex; flex-direction: column; gap: 0.35rem; }
-.report-tab {
-  width: 100%; text-align: left; padding: 0.65rem 0.8rem; border: 1px solid #e2e8f0;
-  border-radius: 8px; background: #fff; color: #64748b; font-weight: 600; cursor: pointer;
-}
-.report-tab.active { background: #4f6ef7; color: #fff; border-color: #4f6ef7; }
-.report-match-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+/* ── Result panel (right rail) ── */
+.result-actor-name { display: block; font-size: 0.95rem; font-weight: 700; color: #1a1a2e; }
+.result-actor-meta { display: block; font-size: 0.75rem; color: #64748b; margin-top: 0.15rem; text-transform: capitalize; }
+.result-panel { display: flex; flex-direction: column; gap: 0; padding: 1rem 1.25rem; }
+.result-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem; }
+.topk-bar { display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; color: #64748b; }
+.topk-controls { display: flex; align-items: center; gap: 0.25rem; }
+.topk-btn { width: 24px; height: 24px; border-radius: 5px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer; font-size: 0.9rem; font-weight: 700; color: #374151; display: flex; align-items: center; justify-content: center; }
+.topk-btn:hover { background: #f1f5f9; }
+.topk-val { font-size: 0.9rem; font-weight: 700; color: #1a1a2e; min-width: 18px; text-align: center; }
+.result-section { margin-bottom: 0.65rem; }
+.result-section-head { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0.3rem 0; background: none; border: none; cursor: pointer; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; }
+.result-section-head:hover { color: #1a1a2e; }
+.result-card { border: 1px solid #e2e8f0; border-radius: 7px; overflow: hidden; margin-bottom: 0.35rem; background: #fff; }
+.result-card-confirmed { border-color: #bbf7d0; background: #f0fdf4; }
+.result-card-row { display: flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.55rem; }
+.result-expand-btn { background: none; border: none; cursor: pointer; color: #94a3b8; font-size: 0.65rem; padding: 0; flex-shrink: 0; width: 14px; line-height: 1; }
+.result-card-name { flex: 1; font-size: 0.82rem; font-weight: 600; color: #1a1a2e; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.result-link-btn { padding: 0.22rem 0.6rem !important; font-size: 0.72rem !important; border-radius: 5px !important; flex-shrink: 0; }
+.result-card-reason { padding: 0.35rem 0.55rem 0.5rem; font-size: 0.76rem; color: #475569; line-height: 1.5; border-top: 1px solid #f1f5f9; background: #fafbff; }
 .network-match-card {
   background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem;
   display: flex; flex-direction: column; gap: 0.6rem; min-height: 190px;

@@ -4,7 +4,7 @@ export function getGeminiModel() {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error('GEMINI_API_KEY is not set')
   const genAI = new GoogleGenerativeAI(apiKey)
-  return genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+  return genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 }
 
 export async function getMatches(model: ReturnType<GoogleGenerativeAI['getGenerativeModel']>, prompt: string): Promise<Record<string, unknown[]>> {

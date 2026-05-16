@@ -172,7 +172,7 @@ export async function runMatchingAgent(startupId: string): Promise<AgentMatchRes
 
   const genAI = new GoogleGenerativeAI(apiKey)
   const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
+    model: 'gemini-2.0-flash',
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tools: [{ functionDeclarations: TOOL_DECLARATIONS }] as any,
   })
@@ -263,7 +263,7 @@ Score range 60-100. Top 3 only.`
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
     const res = await model.generateContent(prompt)
     const text = res.response.text().replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
     const parsed = JSON.parse(text)
