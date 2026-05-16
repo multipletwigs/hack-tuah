@@ -12,6 +12,7 @@ function scoreClass(score: number) {
 }
 
 function actorTagClass(t: ActorType) {
+  if (t === 'startup') return 'tag-startup'
   if (t === 'mentor') return 'tag-mentor'
   if (t === 'initiative' || String(t) === 'programme') return 'tag-programme'
   return 'tag-corporate'
@@ -40,15 +41,20 @@ export default function LinkageTable({ linkages }: Props) {
       <table className="linkage-table">
         <thead>
           <tr>
-            <th>Startup</th><th>Actor Type</th><th>Partner Type</th>
-            <th>Actor Name</th><th>Match Score</th><th>Status</th>
+            <th>Source</th><th>Source Type</th><th>Target Type</th><th>Partner Type</th>
+            <th>Target Name</th><th>Match Score</th><th>Status</th>
             <th>Date</th><th>Outcome</th>
           </tr>
         </thead>
         <tbody>
           {linkages.map(row => (
             <tr key={row.linkageId}>
-              <td>{row.startupName}</td>
+              <td>{row.sourceName}</td>
+              <td>
+                <span className={`actor-tag ${actorTagClass(row.sourceType)}`}>
+                  {actorLabel(row.sourceType)}
+                </span>
+              </td>
               <td>
                 <span className={`actor-tag ${actorTagClass(row.actorType)}`}>
                   {actorLabel(row.actorType)}

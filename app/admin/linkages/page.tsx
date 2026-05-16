@@ -7,7 +7,7 @@ import type { Linkage, ActorType, PartnerType } from '@/app/lib/types'
 interface Filters {
   actorType: ActorType | ''
   partnerType: PartnerType | ''
-  startup: string
+  source: string
   status: string
 }
 
@@ -15,7 +15,7 @@ export default function LinkagesPage() {
   const [linkages, setLinkages] = useState<Linkage[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [filters, setFilters] = useState<Filters>({ actorType: '', partnerType: '', startup: '', status: '' })
+  const [filters, setFilters] = useState<Filters>({ actorType: '', partnerType: '', source: '', status: '' })
 
   useEffect(() => {
     fetch('/api/linkages')
@@ -31,14 +31,14 @@ export default function LinkagesPage() {
   const filtered = linkages.filter(l =>
     (!filters.actorType   || l.actorType === filters.actorType || (filters.actorType === 'initiative' && String(l.actorType) === 'programme')) &&
     (!filters.partnerType || l.partnerType === filters.partnerType) &&
-    (!filters.startup     || l.startupName.toLowerCase().includes(filters.startup.toLowerCase())) &&
+    (!filters.source      || l.sourceName.toLowerCase().includes(filters.source.toLowerCase())) &&
     (!filters.status      || l.status === filters.status)
   )
 
   function exportCSV() {
-    const header = ['Startup', 'Actor Type', 'Partner Type', 'Actor Name', 'Match Score', 'Status', 'Date', 'Outcome']
+    const header = ['Source', 'Source Type', 'Target Type', 'Partner Type', 'Target Name', 'Match Score', 'Status', 'Date', 'Outcome']
     const rows = filtered.map(l => [
-      l.startupName, l.actorType, l.partnerType ?? '', l.actorName,
+      l.sourceName, l.sourceType, l.actorType, l.partnerType ?? '', l.actorName,
       `${l.matchScore}%`, l.status, l.createdAt?.slice(0, 10) ?? '—', l.outcome ?? '—',
     ])
     const csv = [header, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n')
@@ -78,8 +78,8 @@ export default function LinkagesPage() {
           </select>
         </div>
         <div className="filter-group">
-          <label htmlFor="f-startup">Startup Name</label>
-          <input id="f-startup" type="text" placeholder="Search startup…" value={filters.startup} onChange={e => handleFilter('startup', e.target.value)} />
+          <label htmlFor="f-source">Source Name</label>
+          <input id="f-source" type="text" placeholder="Search source…" value={filters.source} onChange={e => handleFilter('source', e.target.value)} />
         </div>
         <div className="filter-group">
           <label htmlFor="f-status">Status</label>

@@ -93,7 +93,8 @@ function topCandidates(startup: StartupForMatching, records: RawRecord[], limit 
 }
 
 async function storePartnersAsCandidates(): Promise<RawRecord[]> {
-  return (await store.getAllPartners()).map(partner => ({
+  const partners = await store.getAllPartners()
+  return partners.map(partner => ({
     id: partner.partner_id,
     name: partner.org_name,
     partner_type: partner.partner_type,
@@ -104,7 +105,8 @@ async function storePartnersAsCandidates(): Promise<RawRecord[]> {
 }
 
 async function storeInitiativesAsCandidates(): Promise<RawRecord[]> {
-  return (await store.getAllInitiatives()).map(initiative => {
+  const initiatives = await store.getAllInitiatives()
+  return initiatives.map(initiative => {
     const publicInitiative = docToInitiative(initiative)!
     return {
       id: publicInitiative.initiativeId,
@@ -132,18 +134,19 @@ function dedupeById(records: RawRecord[]): RawRecord[] {
 
 async function fetchCandidateSet(startup: StartupForMatching, trace: ToolTrace[]): Promise<CandidateSet> {
   const seed = loadSeedData()
-  const [storePartners, storeInitiatives] = await Promise.all([
+  const [storeMentorCandidates, storeInitCandidates, storePartnerCandidates] = await Promise.all([
     storePartnersAsCandidates(),
     storeInitiativesAsCandidates(),
+    storePartnersAsCandidates(),
   ])
   const mentors = dedupeById([
     ...seed.mentors,
-    ...storePartners.filter(partner => partner.partner_type === 'mentor'),
+    ...storeMentorCandidates.filter(partner => partner.partner_type === 'mentor'),
   ])
-  const initiatives = dedupeById([...seed.initiatives, ...storeInitiatives])
+  const initiatives = dedupeById([...seed.initiatives, ...storeInitCandidates])
   const partners = dedupeById([
     ...seed.partners,
-    ...storePartners.filter(partner => partner.partner_type !== 'mentor'),
+    ...storePartnerCandidates.filter(partner => partner.partner_type !== 'mentor'),
   ])
 
   const criteria = { industry: startup.industry, stage: startup.stage, needs: startup.needs }
@@ -192,6 +195,14 @@ function startupSearchText(startup: StartupForMatching): string {
   ].join(' ')
 }
 
+function preview(value: string, limit = 700): string {
+  return value.length > limit ? `${value.slice(0, limit)}...` : value
+}
+
+function logMatchingEngine(event: string, data: Record<string, unknown>) {
+  console.info('[matching-engine]', { event, ...data })
+}
+
 async function findStartupFromQuery(query: string, trace: ToolTrace[]): Promise<StartupForMatching | null> {
   const startups = await store.getAllStartups()
   trace.push({ tool: 'fetch_startup_list', input: { query }, resultCount: startups.length })
@@ -219,7 +230,7 @@ async function findStartupFromQuery(query: string, trace: ToolTrace[]): Promise<
   return selected
 }
 
-async function runMatching(startup: StartupForMatching, trace: ToolTrace[]): Promise<MatchingEngineResult> {
+async function runMatching(startup: StartupForMatching, trace: ToolTrace[], requestId = crypto.randomUUID()): Promise<MatchingEngineResult> {
   trace.push({
     tool: 'reason',
     input: {
@@ -229,28 +240,47 @@ async function runMatching(startup: StartupForMatching, trace: ToolTrace[]): Pro
 
   const candidates = await fetchCandidateSet(startup, trace)
   const prompt = buildMatchingPrompt(startup, candidates.mentors, candidates.initiatives, candidates.partners)
+  logMatchingEngine('run-start', {
+    requestId,
+    startupId: startup.startup_id,
+    startupName: startup.startup_name,
+    promptLength: prompt.length,
+    promptPreview: preview(prompt),
+    mentors: candidates.mentors.length,
+    initiatives: candidates.initiatives.length,
+    partners: candidates.partners.length,
+  })
   const model = getGeminiModel()
+  logMatchingEngine('model-call', { requestId, model: GEMINI_MODEL })
   const raw = await getMatches(model, prompt)
 
   trace.push({ tool: 'rank_matches_with_llm', input: { model: GEMINI_MODEL } })
+  logMatchingEngine('model-response', {
+    requestId,
+    mentors: raw.mentors?.length ?? 0,
+    initiatives: raw.initiatives?.length ?? raw.programmes?.length ?? 0,
+    corporatePartners: raw.corporate_partners?.length ?? 0,
+    investors: raw.investors?.length ?? 0,
+    serviceProviders: raw.service_providers?.length ?? 0,
+  })
   return { startup, matches: toMatchResponse(raw), trace }
 }
 
-export async function matchStartupById(startupId: string): Promise<MatchingEngineResult | null> {
+export async function matchStartupById(startupId: string, requestId = crypto.randomUUID()): Promise<MatchingEngineResult | null> {
   const startup = await store.getStartup(startupId)
   if (!startup) return null
 
   const trace: ToolTrace[] = [
     { tool: 'fetch_startup_by_id', input: { startupId }, selectedId: startup.startup_id },
   ]
-  return runMatching(startup, trace)
+  return runMatching(startup, trace, requestId)
 }
 
-export async function matchNaturalLanguageQuery(query: string): Promise<MatchingEngineResult | null> {
+export async function matchNaturalLanguageQuery(query: string, requestId = crypto.randomUUID()): Promise<MatchingEngineResult | null> {
   const trace: ToolTrace[] = [
     { tool: 'parse_request', input: { query } },
   ]
   const startup = await findStartupFromQuery(query, trace)
   if (!startup) return null
-  return runMatching(startup, trace)
+  return runMatching(startup, trace, requestId)
 }

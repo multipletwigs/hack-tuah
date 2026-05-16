@@ -9,18 +9,40 @@ function generateLinkageId(): string {
 
 export async function POST(request: NextRequest) {
   const body = await request.json()
-  const { startupId, startupName, actorType, partnerType, actorId, actorName, matchScore, matchReason } = body
+  const {
+    startupId,
+    startupName,
+    sourceId,
+    sourceName,
+    sourceType,
+    sourcePartnerType,
+    actorType,
+    partnerType,
+    actorId,
+    actorName,
+    matchScore,
+    matchReason,
+  } = body
 
-  if (!startupId || !startupName || !actorType || !actorId || !actorName) {
+  const normalizedSourceId = sourceId ?? startupId
+  const normalizedSourceName = sourceName ?? startupName
+  const normalizedSourceType = sourceType ?? 'startup'
+
+  if (!normalizedSourceId || !normalizedSourceName || !normalizedSourceType || !actorType || !actorId || !actorName) {
     return Response.json({ error: 'Missing required fields' }, { status: 422 })
   }
 
   const linkageId = generateLinkageId()
   const normalizedActorType = actorType === 'programme' ? 'initiative' : actorType
+  const sourceIsStartup = normalizedSourceType === 'startup'
   await store.saveLinkage({
     linkage_id: linkageId,
-    startup_id: startupId,
-    startup_name: startupName,
+    startup_id: sourceIsStartup ? normalizedSourceId : '',
+    startup_name: sourceIsStartup ? normalizedSourceName : '',
+    source_id: normalizedSourceId,
+    source_name: normalizedSourceName,
+    source_type: normalizedSourceType,
+    source_partner_type: sourcePartnerType ?? null,
     actor_type: normalizedActorType,
     partner_type: partnerType ?? null,
     actor_id: actorId,
