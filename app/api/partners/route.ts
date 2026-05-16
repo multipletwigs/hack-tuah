@@ -7,7 +7,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const body = await request.json()
-  const { orgName, contactName, contactEmail, partnerType, industry } = body
+  const { orgName, contactName, contactEmail, partnerType, industry, shortDescription } = body
 
   if (!orgName || !contactName || !contactEmail || !partnerType) {
     return Response.json({ error: 'Missing required fields' }, { status: 422 })
@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
     contact_email: contactEmail,
     partner_type: partnerType,
     industry: industry ?? '',
+    short_description: shortDescription ?? '',
     status: 'pending_review',
     created_at: new Date().toISOString(),
   })

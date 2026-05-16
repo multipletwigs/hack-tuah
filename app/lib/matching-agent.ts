@@ -223,6 +223,7 @@ async function startupCandidateRecords(excludeId?: string): Promise<Array<Record
       industry: startup.industry,
       stage: startup.stage,
       problem: startup.problem,
+      short_description: startup.short_description,
       needs: startup.needs,
     }))
 }
@@ -237,6 +238,7 @@ async function partnerCandidateRecords(partnerType: string, excludeId?: string):
       actor_type: partner.partner_type === 'mentor' ? 'mentor' : 'partner',
       partner_type: partner.partner_type === 'mentor' ? null : partner.partner_type,
       industry: partner.industry,
+      short_description: partner.short_description,
       status: partner.status,
     }))
 }
@@ -436,6 +438,7 @@ export async function runActorMatching(actorId: string, actorType: 'partner' | '
       actor_type: rec.partnerType === 'mentor' ? 'mentor' : 'partner',
       partner_type: rec.partnerType === 'mentor' ? null : rec.partnerType,
       industry: rec.industry,
+      short_description: rec.shortDescription,
       status: rec.status,
       ...extra,
     }

@@ -17,6 +17,7 @@ export interface StartupDoc {
   stage: string
   problem: string
   needs: string[]
+  short_description?: string
   created_at: string
 }
 
@@ -48,6 +49,7 @@ export interface PartnerDoc {
   partner_type: string
   industry: string
   status: string
+  short_description?: string
   created_at: string
 }
 
@@ -176,6 +178,7 @@ export function docToPartnerRecord(doc: PartnerDoc | null): PartnerRecord | null
     partnerType: doc.partner_type as PartnerRecord['partnerType'],
     industry: doc.industry,
     status: doc.status as PartnerRecord['status'],
+    shortDescription: doc.short_description,
     createdAt: tsToISO(doc.created_at),
   }
 }

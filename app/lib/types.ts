@@ -20,6 +20,7 @@ export interface PartnerRecord {
   partnerType: PartnerType | 'mentor'
   industry: string
   status: 'active' | 'pending_review'
+  shortDescription?: string
   createdAt: string
 }
 export type PartnerType = 'corporate' | 'investor' | 'service_provider'

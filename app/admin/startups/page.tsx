@@ -10,6 +10,7 @@ interface StartupRow {
   industry: string
   stage: string
   needs: string[]
+  short_description?: string
   created_at: string
 }
 
@@ -20,6 +21,7 @@ interface FormState {
   stage: string
   problem: string
   needs: string[]
+  shortDescription: string
 }
 
 const NEEDS_OPTIONS = ['mentorship', 'funding', 'pilot partners', 'networking']
@@ -35,7 +37,7 @@ export default function StartupsPage() {
   const [startups, setStartups] = useState<StartupRow[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
-  const [form, setForm] = useState<FormState>({ startupName: '', cofounderName: '', industry: '', stage: '', problem: '', needs: [] })
+  const [form, setForm] = useState<FormState>({ startupName: '', cofounderName: '', industry: '', stage: '', problem: '', needs: [], shortDescription: '' })
   const [saving, setSaving] = useState(false)
 
   function load() {
@@ -67,7 +69,7 @@ export default function StartupsPage() {
       })
       if (!res.ok) throw new Error((await res.json()).error)
       setShowModal(false)
-      setForm({ startupName: '', cofounderName: '', industry: '', stage: '', problem: '', needs: [] })
+      setForm({ startupName: '', cofounderName: '', industry: '', stage: '', problem: '', needs: [], shortDescription: '' })
       load()
       showToast('Startup added')
     } catch (err) {
@@ -90,7 +92,7 @@ export default function StartupsPage() {
       <div className="mgmt-table-wrap">
         <table className="mgmt-table">
           <thead>
-            <tr><th>Startup</th><th>Industry</th><th>Stage</th><th>Cofounder</th><th>Needs</th><th>Enrolled</th></tr>
+            <tr><th>Startup</th><th>Description</th><th>Industry</th><th>Stage</th><th>Cofounder</th><th>Needs</th><th>Enrolled</th></tr>
           </thead>
           <tbody>
             {loading
@@ -100,6 +102,7 @@ export default function StartupsPage() {
               : startups.map(s => (
                 <tr key={s.startup_id}>
                   <td><strong>{s.startup_name}</strong></td>
+                  <td style={{ maxWidth: 220, color: '#475569', fontSize: '0.82rem' }}>{s.short_description || '—'}</td>
                   <td><span className={`actor-tag ${INDUSTRY_TAG[s.industry] ?? 'tag-corporate'}`}>{s.industry}</span></td>
                   <td>{s.stage}</td>
                   <td>{s.cofounder_name}</td>
@@ -145,6 +148,10 @@ export default function StartupsPage() {
               <div className="form-group">
                 <label>Problem Statement</label>
                 <textarea name="problem" rows={3} value={form.problem} onChange={handleChange} placeholder="What problem does this startup solve?" required />
+              </div>
+              <div className="form-group">
+                <label>Short Description</label>
+                <textarea name="shortDescription" rows={2} value={form.shortDescription} onChange={handleChange} placeholder="One or two sentences describing this startup for the matching engine." />
               </div>
               <div className="form-group">
                 <label>Needs</label>

@@ -3,7 +3,7 @@ import { store } from '@/app/lib/store'
 
 export async function POST(request: NextRequest) {
   const body = await request.json()
-  const { cofounderName, startupName, industry, stage, problem, needs } = body
+  const { cofounderName, startupName, industry, stage, problem, needs, shortDescription } = body
 
   if (!cofounderName || !startupName || !industry || !stage || !problem) {
     return Response.json({ error: 'Missing required fields' }, { status: 422 })
@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
     stage,
     problem,
     needs: needs ?? [],
+    short_description: shortDescription ?? '',
     created_at: new Date().toISOString(),
   })
 

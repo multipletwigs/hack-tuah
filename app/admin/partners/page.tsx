@@ -28,7 +28,7 @@ function typeLabel(t: string) {
 }
 
 interface FormState {
-  orgName: string; contactName: string; contactEmail: string; partnerType: string; industry: string
+  orgName: string; contactName: string; contactEmail: string; partnerType: string; industry: string; shortDescription: string
 }
 
 export default function PartnersPage() {
@@ -36,7 +36,7 @@ export default function PartnersPage() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<Tab>('All')
   const [showModal, setShowModal] = useState(false)
-  const [form, setForm] = useState<FormState>({ orgName: '', contactName: '', contactEmail: '', partnerType: '', industry: '' })
+  const [form, setForm] = useState<FormState>({ orgName: '', contactName: '', contactEmail: '', partnerType: '', industry: '', shortDescription: '' })
   const [saving, setSaving] = useState(false)
 
   function load() {
@@ -47,7 +47,7 @@ export default function PartnersPage() {
 
   const filtered = partners.filter(p => !TAB_FILTER[tab] || p.partnerType === TAB_FILTER[tab])
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }))
   }
 
@@ -63,7 +63,7 @@ export default function PartnersPage() {
       })
       if (!res.ok) throw new Error((await res.json()).error)
       setShowModal(false)
-      setForm({ orgName: '', contactName: '', contactEmail: '', partnerType: '', industry: '' })
+      setForm({ orgName: '', contactName: '', contactEmail: '', partnerType: '', industry: '', shortDescription: '' })
       load()
       showToast('Partner added')
     } catch (err) {
@@ -77,7 +77,7 @@ export default function PartnersPage() {
     <div className="admin-content">
       <div className="mgmt-header">
         <div className="mgmt-header-left">
-          <h1 className="page-title">Partners & Mentors</h1>
+          <h1 className="page-title">Partners</h1>
           {!loading && <span className="count-badge">{partners.length}</span>}
         </div>
         <button className="btn btn-primary" onClick={() => setShowModal(true)}>+ Add Partner</button>
@@ -92,7 +92,7 @@ export default function PartnersPage() {
       <div className="mgmt-table-wrap">
         <table className="mgmt-table">
           <thead>
-            <tr><th>Name</th><th>Type</th><th>Industry</th><th>Contact</th><th>Status</th><th>Added</th></tr>
+            <tr><th>Name</th><th>Description</th><th>Type</th><th>Industry</th><th>Contact</th><th>Status</th><th>Added</th></tr>
           </thead>
           <tbody>
             {loading
@@ -102,6 +102,7 @@ export default function PartnersPage() {
               : filtered.map((p, i) => (
                 <tr key={p.partnerId ?? i}>
                   <td><strong>{p.orgName}</strong></td>
+                  <td style={{ maxWidth: 220, color: '#475569', fontSize: '0.82rem' }}>{p.shortDescription || '—'}</td>
                   <td><span className={`actor-tag ${typeTagClass(p.partnerType)}`}>{typeLabel(p.partnerType)}</span></td>
                   <td>{p.industry}</td>
                   <td style={{ fontSize: '0.8rem', color: '#64748b' }}>{p.contactEmail}</td>
@@ -144,6 +145,10 @@ export default function PartnersPage() {
               <div className="form-group">
                 <label>Industry / Focus</label>
                 <input name="industry" value={form.industry} onChange={handleChange} placeholder="e.g. fintech, legal" />
+              </div>
+              <div className="form-group">
+                <label>Short Description</label>
+                <textarea name="shortDescription" rows={2} value={form.shortDescription} onChange={handleChange} placeholder="What does this partner offer, or what is their investment thesis?" />
               </div>
               <button type="submit" className="btn btn-primary btn-full" disabled={saving}>{saving ? 'Saving…' : 'Add Partner'}</button>
             </form>

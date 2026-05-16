@@ -15,9 +15,10 @@ interface FormState {
   name: string
   email: string
   expertise: string
+  shortDescription: string
 }
 
-const EMPTY_FORM: FormState = { name: '', email: '', expertise: '' }
+const EMPTY_FORM: FormState = { name: '', email: '', expertise: '', shortDescription: '' }
 
 export default function MentorsPage() {
   const [mentors, setMentors] = useState<PartnerRecord[]>([])
@@ -45,7 +46,7 @@ export default function MentorsPage() {
     m.industry.toLowerCase().includes(search.toLowerCase())
   )
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }))
   }
 
@@ -63,6 +64,7 @@ export default function MentorsPage() {
           contactEmail: form.email,
           partnerType: 'mentor',
           industry: form.expertise,
+          shortDescription: form.shortDescription,
         }),
       })
       if (!res.ok) throw new Error((await res.json()).error)
@@ -120,6 +122,7 @@ export default function MentorsPage() {
           <thead>
             <tr>
               <th>Name</th>
+              <th>Description</th>
               <th>Expertise</th>
               <th>Email</th>
               <th>Status</th>
@@ -129,12 +132,13 @@ export default function MentorsPage() {
           </thead>
           <tbody>
             {loading
-              ? <tr key="loading"><td colSpan={6}><div className="empty-state">Loading…</div></td></tr>
+              ? <tr key="loading"><td colSpan={7}><div className="empty-state">Loading…</div></td></tr>
               : filtered.length === 0
-              ? <tr key="empty"><td colSpan={6}><div className="empty-state">{search ? 'No mentors match your search.' : 'No mentors yet. Add the first one!'}</div></td></tr>
+              ? <tr key="empty"><td colSpan={7}><div className="empty-state">{search ? 'No mentors match your search.' : 'No mentors yet. Add the first one!'}</div></td></tr>
               : filtered.map((m, i) => (
                 <tr key={m.partnerId ?? i}>
                   <td><strong>{m.orgName}</strong></td>
+                  <td style={{ maxWidth: 220, color: '#475569', fontSize: '0.82rem' }}>{m.shortDescription || '—'}</td>
                   <td>
                     <span className="actor-tag tag-mentor">{m.industry || '—'}</span>
                   </td>
@@ -201,6 +205,16 @@ export default function MentorsPage() {
                   value={form.expertise}
                   onChange={handleChange}
                   placeholder="e.g. fintech, legal, B2B SaaS"
+                />
+              </div>
+              <div className="form-group">
+                <label>Short Description</label>
+                <textarea
+                  name="shortDescription"
+                  rows={2}
+                  value={form.shortDescription}
+                  onChange={handleChange}
+                  placeholder="What does this mentor offer? What is their background?"
                 />
               </div>
               <button
