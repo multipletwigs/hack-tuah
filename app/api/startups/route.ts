@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
   }
 
   const startupId = `startup_${Math.random().toString(16).slice(2, 10)}`
-  store.saveStartup(startupId, {
+  await store.saveStartup(startupId, {
     startup_id: startupId,
     cofounder_name: cofounderName,
     startup_name: startupName,
@@ -25,5 +25,5 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  return Response.json(store.getAllStartups())
+  return Response.json(await store.getAllStartups())
 }

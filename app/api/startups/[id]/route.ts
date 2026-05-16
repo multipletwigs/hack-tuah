@@ -6,7 +6,7 @@ export async function GET(
   ctx: RouteContext<'/api/startups/[id]'>,
 ) {
   const { id } = await ctx.params
-  const startup = store.getStartup(id)
+  const startup = await store.getStartup(id)
   if (!startup) return Response.json({ error: `Startup '${id}' not found` }, { status: 404 })
   return Response.json(startup)
 }
