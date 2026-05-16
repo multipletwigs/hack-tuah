@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
   const { message, context } = await request.json()
 
 
-  const startups = store.getAllStartups()
+  const startups = await store.getAllStartups()
   const startupList = startups
     .map(s => `${s.startup_id}: ${s.startup_name} (${s.industry}, ${s.stage})`)
     .join('\n')

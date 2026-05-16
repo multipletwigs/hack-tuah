@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { href: '/admin',             icon: '▦',  label: 'Dashboard' },
   { href: '/admin/startups',    icon: '🚀', label: 'Startups' },
   { href: '/admin/partners',    icon: '🤝', label: 'Partners' },
+  { href: '/admin/mentors',     icon: '🧑‍🏫', label: 'Mentors' },
   { href: '/admin/initiatives', icon: '🏛️', label: 'Initiatives' },
   { href: '/admin/matches',     icon: '✨', label: 'Matches' },
   { href: '/admin/linkages',    icon: '🔗', label: 'Linkages' },

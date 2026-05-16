@@ -116,6 +116,14 @@ export const store = {
     return snap.docs.map(d => d.data() as PartnerDoc)
   },
 
+  async deletePartner(id: string): Promise<boolean> {
+    const ref = db.collection('partners').doc(id)
+    const snap = await ref.get()
+    if (!snap.exists) return false
+    await ref.delete()
+    return true
+  },
+
   // --- Initiatives ---
   async saveInitiative(id: string, doc: InitiativeDoc) {
     await db.collection('initiatives').doc(id).set(doc)
