@@ -1,4 +1,6 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { readFileSync } from 'fs'
+import { join } from 'path'
+import { getModel, responseText, responseFunctionCalls } from './vertex'
 import { store, docToPartnerRecord, docToInitiative } from './store'
 
 export interface AgentStep {
@@ -167,15 +169,7 @@ For each match_reason (exactly 2 sentences):
 Score range: 60–100. Be selective — only include actors with genuine alignment.`
 
 export async function runMatchingAgent(startupId: string): Promise<AgentMatchResult> {
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) throw new Error('GEMINI_API_KEY is not set')
-
-  const genAI = new GoogleGenerativeAI(apiKey)
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    tools: [{ functionDeclarations: TOOL_DECLARATIONS }] as any,
-  })
+  const model = getModel(TOOL_DECLARATIONS)
 
   const chat = model.startChat({
     history: [
@@ -190,7 +184,7 @@ export async function runMatchingAgent(startupId: string): Promise<AgentMatchRes
   )
 
   for (let i = 0; i < 10; i++) {
-    const calls = result.response.functionCalls()
+    const calls = responseFunctionCalls(result.response)
     if (!calls || calls.length === 0) break
 
     const responses = []
@@ -222,9 +216,6 @@ export async function runMatchingAgent(startupId: string): Promise<AgentMatchRes
 }
 
 export async function runActorMatching(actorId: string, actorType: 'partner' | 'initiative'): Promise<AgentMatchResult> {
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) throw new Error('GEMINI_API_KEY is not set')
-
   const empty = { steps: [], direction: 'from-actor' as const, startups: [], mentors: [], corporatePartners: [], investors: [], serviceProviders: [], initiatives: [] }
 
   let actorProfile: string
@@ -232,16 +223,54 @@ export async function runActorMatching(actorId: string, actorType: 'partner' | '
     const doc = store.getPartner(actorId)
     if (!doc) throw new Error(`Partner '${actorId}' not found`)
     const rec = docToPartnerRecord(doc)!
-    actorProfile = `Type: ${rec.partnerType}\nOrg: ${rec.orgName}\nIndustry: ${rec.industry}`
+
+    // Enrich profile from JSON seed file if available
+    let extra = ''
+    try {
+      const dataDir = join(process.cwd(), 'data')
+      const file = rec.partnerType === 'mentor' ? 'mentors.json' : 'partners.json'
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const all: any[] = JSON.parse(readFileSync(join(dataDir, file), 'utf8'))
+      const match = all.find((x: { name?: string }) => x.name === rec.orgName)
+      if (match) {
+        if (match.background)          extra += `\nBackground: ${match.background}`
+        if (match.expertise)           extra += `\nExpertise: ${match.expertise.join(', ')}`
+        if (match.investment_thesis)   extra += `\nInvestment thesis: ${match.investment_thesis}`
+        if (match.what_they_offer)     extra += `\nWhat they offer: ${match.what_they_offer.join(', ')}`
+        if (match.industries_interested) extra += `\nIndustries: ${match.industries_interested.join(', ')}`
+        if (match.suitable_for_stage)  extra += `\nSuitable for stage: ${match.suitable_for_stage.join(', ')}`
+        if (match.investment_stage)    extra += `\nInvestment stage: ${match.investment_stage.join(', ')}`
+        if (match.ticket_size_min)     extra += `\nTicket size: $${match.ticket_size_min}–$${match.ticket_size_max}`
+        if (match.startup_stage)       extra += `\nMentors startups at: ${match.startup_stage.join(', ')}`
+      }
+    } catch { /* JSON files optional */ }
+
+    actorProfile = `Type: ${rec.partnerType}\nOrg: ${rec.orgName}\nIndustry: ${rec.industry}${extra}`
   } else {
     const doc = store.getInitiative(actorId)
     if (!doc) throw new Error(`Initiative '${actorId}' not found`)
     const init = docToInitiative(doc)!
-    actorProfile = `Type: initiative / ${init.type}\nName: ${init.name}\nDescription: ${init.description}\nFocus Industries: ${init.focusIndustries.join(', ')}\nStatus: ${init.status}`
+
+    // Enrich with eligibility/benefits from JSON seed file
+    let extra = ''
+    try {
+      const all: Array<Record<string, unknown>> = JSON.parse(
+        readFileSync(join(process.cwd(), 'data', 'initiatives.json'), 'utf8')
+      )
+      const match = all.find(x => x.name === init.name)
+      if (match) {
+        const elig = match.eligibility as Record<string, unknown> | undefined
+        if (elig?.stage)            extra += `\nEligible stages: ${(elig.stage as string[]).join(', ')}`
+        if (elig?.must_be_malaysian) extra += `\nMust be Malaysian: ${elig.must_be_malaysian}`
+        if (match.benefits)         extra += `\nBenefits: ${(match.benefits as string[]).join(', ')}`
+      }
+    } catch { /* JSON files optional */ }
+
+    actorProfile = `Type: initiative / ${init.type}\nName: ${init.name}\nDescription: ${init.description}\nFocus Industries: ${init.focusIndustries.join(', ')}\nStatus: ${init.status}${extra}`
   }
 
   const startupList = store.getAllStartups().map(s =>
-    `ID: ${s.startup_id} | ${s.startup_name} | ${s.industry} | ${s.stage} | needs: ${(s.needs ?? []).join(', ')}`
+    `ID: ${s.startup_id} | ${s.startup_name} | ${s.industry} | ${s.stage} | problem: ${s.problem} | needs: ${(s.needs ?? []).join(', ')}`
   ).join('\n')
 
   const prompt = `You are a Cradle ecosystem matching agent.
@@ -261,17 +290,12 @@ Find the top 3 startups that best fit this actor. Return JSON only (no markdown 
 
 Score range 60-100. Top 3 only.`
 
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
-    const res = await model.generateContent(prompt)
-    const text = res.response.text().replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-    const parsed = JSON.parse(text)
-    return {
-      ...empty,
-      startups: (parsed.startups ?? []).map((x: Record<string, unknown>) => toEntry(x, 'startup', null)),
-    }
-  } catch {
-    return empty
+  const model = getModel()
+  const res = await model.generateContent(prompt)
+  const text = responseText(res.response).replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+  const parsed = JSON.parse(text)
+  return {
+    ...empty,
+    startups: (parsed.startups ?? []).map((x: Record<string, unknown>) => toEntry(x, 'startup', null)),
   }
 }

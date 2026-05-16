@@ -69,6 +69,7 @@ function allMatchEntries(result: AgentMatchResult | null): MatchEntry[] {
     ...result.investors,
     ...result.serviceProviders,
     ...result.initiatives,
+    ...result.startups,
   ])
 }
 
@@ -502,6 +503,11 @@ export default function MatchesPage() {
               </p>
             )}
             {error && <p style={{ color: '#dc2626', fontSize: '0.85rem', marginBottom: '0.75rem' }}>{error}</p>}
+            {result && !loading && resultSections.length === 0 && (
+              <p className="network-empty" style={{ padding: '1.5rem 0', color: '#94a3b8' }}>
+                No matches found for this actor.
+              </p>
+            )}
 
             {resultSections.map(section => (
               <ResultSection

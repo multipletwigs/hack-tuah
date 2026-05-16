@@ -1,15 +1,14 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { getModel, responseText, GEMINI_MODEL } from './vertex'
+
+export { GEMINI_MODEL }
 
 export function getGeminiModel() {
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) throw new Error('GEMINI_API_KEY is not set')
-  const genAI = new GoogleGenerativeAI(apiKey)
-  return genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+  return getModel()
 }
 
-export async function getMatches(model: ReturnType<GoogleGenerativeAI['getGenerativeModel']>, prompt: string): Promise<Record<string, unknown[]>> {
+export async function getMatches(model: ReturnType<typeof getModel>, prompt: string): Promise<Record<string, unknown[]>> {
   const result = await model.generateContent(prompt)
-  let text = result.response.text().trim()
+  let text = responseText(result.response).trim()
 
   if (text.startsWith('```')) {
     const lines = text.split('\n').slice(1)

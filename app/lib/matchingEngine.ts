@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { getGeminiModel, getMatches } from './gemini'
+import { getGeminiModel, getMatches, GEMINI_MODEL } from './gemini'
 import { buildMatchingPrompt } from './prompts'
 import { store, docToInitiative } from './store'
 import type { MatchResponse, MatchResult, PartnerType } from './types'
@@ -228,7 +228,7 @@ async function runMatching(startup: StartupForMatching, trace: ToolTrace[]): Pro
   const model = getGeminiModel()
   const raw = await getMatches(model, prompt)
 
-  trace.push({ tool: 'rank_matches_with_llm', input: { model: 'gemini-2.0-flash' } })
+  trace.push({ tool: 'rank_matches_with_llm', input: { model: GEMINI_MODEL } })
   return { startup, matches: toMatchResponse(raw), trace }
 }
 

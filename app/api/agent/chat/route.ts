@@ -1,12 +1,10 @@
 import { NextRequest } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { getModel, responseText } from '@/app/lib/vertex'
 import { store } from '@/app/lib/store'
 
 export async function POST(request: NextRequest) {
   const { message, context } = await request.json()
 
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) return Response.json({ error: 'GEMINI_API_KEY not set' }, { status: 500 })
 
   const startups = store.getAllStartups()
   const startupList = startups
@@ -39,10 +37,9 @@ Rules:
 - Be concise and helpful; mention startup names, not IDs, in the response`
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+    const model = getModel()
     const result = await model.generateContent(prompt)
-    const text = result.response.text().replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    const text = responseText(result.response).replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
     return Response.json(JSON.parse(text))
   } catch {
     return Response.json({
