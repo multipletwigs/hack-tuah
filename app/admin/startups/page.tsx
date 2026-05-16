@@ -104,7 +104,7 @@ export default function StartupsPage() {
                   <td>{s.stage}</td>
                   <td>{s.cofounder_name}</td>
                   <td><div className="needs-chips">{s.needs.map(n => <span key={n} className="need-chip">{n}</span>)}</div></td>
-                  <td>{s.created_at.slice(0, 10)}</td>
+                  <td>{s.created_at?.slice(0, 10) ?? '—'}</td>
                 </tr>
               ))
             }

@@ -1,10 +1,10 @@
 import { store, docToLinkage, docToPartnerRecord } from '@/app/lib/store'
 
 export async function GET() {
-  const allLinkages = store.getAllLinkages().map(docToLinkage)
-  const allStartups = store.getAllStartups()
-  const allPartners = store.getAllPartners().map(p => docToPartnerRecord(p)!)
-  const allInitiatives = store.getAllInitiatives()
+  const allLinkages = (await store.getAllLinkages()).map(docToLinkage)
+  const allStartups = await store.getAllStartups()
+  const allPartners = (await store.getAllPartners()).map(p => docToPartnerRecord(p)!)
+  const allInitiatives = await store.getAllInitiatives()
 
   const activeLinks = allLinkages.filter(l => l.status === 'active')
   const pendingLinks = allLinkages.filter(l => l.status === 'pending')

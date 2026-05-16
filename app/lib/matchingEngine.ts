@@ -92,8 +92,8 @@ function topCandidates(startup: StartupForMatching, records: RawRecord[], limit 
   return (filtered.length ? filtered : scored).slice(0, limit).map(item => item.record)
 }
 
-function storePartnersAsCandidates(): RawRecord[] {
-  return store.getAllPartners().map(partner => ({
+async function storePartnersAsCandidates(): Promise<RawRecord[]> {
+  return (await store.getAllPartners()).map(partner => ({
     id: partner.partner_id,
     name: partner.org_name,
     partner_type: partner.partner_type,
@@ -103,8 +103,8 @@ function storePartnersAsCandidates(): RawRecord[] {
   }))
 }
 
-function storeInitiativesAsCandidates(): RawRecord[] {
-  return store.getAllInitiatives().map(initiative => {
+async function storeInitiativesAsCandidates(): Promise<RawRecord[]> {
+  return (await store.getAllInitiatives()).map(initiative => {
     const publicInitiative = docToInitiative(initiative)!
     return {
       id: publicInitiative.initiativeId,
@@ -130,16 +130,20 @@ function dedupeById(records: RawRecord[]): RawRecord[] {
   })
 }
 
-function fetchCandidateSet(startup: StartupForMatching, trace: ToolTrace[]): CandidateSet {
+async function fetchCandidateSet(startup: StartupForMatching, trace: ToolTrace[]): Promise<CandidateSet> {
   const seed = loadSeedData()
+  const [storePartners, storeInitiatives] = await Promise.all([
+    storePartnersAsCandidates(),
+    storeInitiativesAsCandidates(),
+  ])
   const mentors = dedupeById([
     ...seed.mentors,
-    ...storePartnersAsCandidates().filter(partner => partner.partner_type === 'mentor'),
+    ...storePartners.filter(partner => partner.partner_type === 'mentor'),
   ])
-  const initiatives = dedupeById([...seed.initiatives, ...storeInitiativesAsCandidates()])
+  const initiatives = dedupeById([...seed.initiatives, ...storeInitiatives])
   const partners = dedupeById([
     ...seed.partners,
-    ...storePartnersAsCandidates().filter(partner => partner.partner_type !== 'mentor'),
+    ...storePartners.filter(partner => partner.partner_type !== 'mentor'),
   ])
 
   const criteria = { industry: startup.industry, stage: startup.stage, needs: startup.needs }
@@ -188,8 +192,8 @@ function startupSearchText(startup: StartupForMatching): string {
   ].join(' ')
 }
 
-function findStartupFromQuery(query: string, trace: ToolTrace[]): StartupForMatching | null {
-  const startups = store.getAllStartups()
+async function findStartupFromQuery(query: string, trace: ToolTrace[]): Promise<StartupForMatching | null> {
+  const startups = await store.getAllStartups()
   trace.push({ tool: 'fetch_startup_list', input: { query }, resultCount: startups.length })
 
   const queryNorm = normalize(query)
@@ -223,7 +227,7 @@ async function runMatching(startup: StartupForMatching, trace: ToolTrace[]): Pro
     },
   })
 
-  const candidates = fetchCandidateSet(startup, trace)
+  const candidates = await fetchCandidateSet(startup, trace)
   const prompt = buildMatchingPrompt(startup, candidates.mentors, candidates.initiatives, candidates.partners)
   const model = getGeminiModel()
   const raw = await getMatches(model, prompt)
@@ -233,7 +237,7 @@ async function runMatching(startup: StartupForMatching, trace: ToolTrace[]): Pro
 }
 
 export async function matchStartupById(startupId: string): Promise<MatchingEngineResult | null> {
-  const startup = store.getStartup(startupId)
+  const startup = await store.getStartup(startupId)
   if (!startup) return null
 
   const trace: ToolTrace[] = [
@@ -246,7 +250,7 @@ export async function matchNaturalLanguageQuery(query: string): Promise<Matching
   const trace: ToolTrace[] = [
     { tool: 'parse_request', input: { query } },
   ]
-  const startup = findStartupFromQuery(query, trace)
+  const startup = await findStartupFromQuery(query, trace)
   if (!startup) return null
   return runMatching(startup, trace)
 }

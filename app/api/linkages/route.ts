@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
 
   const linkageId = generateLinkageId()
   const normalizedActorType = actorType === 'programme' ? 'initiative' : actorType
-  store.saveLinkage({
+  await store.saveLinkage({
     linkage_id: linkageId,
     startup_id: startupId,
     startup_name: startupName,
@@ -37,5 +37,5 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  return Response.json(store.getAllLinkages().map(docToLinkage))
+  return Response.json((await store.getAllLinkages()).map(docToLinkage))
 }

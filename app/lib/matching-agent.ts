@@ -100,14 +100,14 @@ const TOOL_DECLARATIONS: any[] = [
   },
 ]
 
-function executeTool(name: string, args: Record<string, string>): unknown {
+async function executeTool(name: string, args: Record<string, string>): Promise<unknown> {
   if (name === 'get_startup_profile') {
-    const doc = store.getStartup(args.startup_id)
+    const doc = await store.getStartup(args.startup_id)
     return doc ?? { error: `Startup '${args.startup_id}' not found` }
   }
 
   if (name === 'search_partners') {
-    const all = store.getAllPartners().filter(p => p.partner_type !== 'mentor')
+    const all = (await store.getAllPartners()).filter(p => p.partner_type !== 'mentor')
     const filtered = all.filter(p => {
       if (args.partner_type && p.partner_type !== args.partner_type) return false
       if (args.industry && !p.industry.toLowerCase().includes(args.industry.toLowerCase())) return false
@@ -117,7 +117,7 @@ function executeTool(name: string, args: Record<string, string>): unknown {
   }
 
   if (name === 'search_mentors') {
-    const all = store.getAllPartners().filter(p => p.partner_type === 'mentor')
+    const all = (await store.getAllPartners()).filter(p => p.partner_type === 'mentor')
     const filtered = all.filter(p =>
       !args.industry || p.industry.toLowerCase().includes(args.industry.toLowerCase())
     )
@@ -125,7 +125,7 @@ function executeTool(name: string, args: Record<string, string>): unknown {
   }
 
   if (name === 'search_initiatives') {
-    const all = store.getAllInitiatives()
+    const all = await store.getAllInitiatives()
     const filtered = all.filter(i => {
       if (args.type && i.type !== args.type) return false
       if (args.industry && !i.focus_industries.some(f => f.toLowerCase().includes(args.industry.toLowerCase()))) return false
@@ -204,7 +204,7 @@ export async function runMatchingAgent(startupId: string): Promise<AgentMatchRes
         }
       }
 
-      const toolResult = executeTool(call.name, call.args as Record<string, string>)
+      const toolResult = await executeTool(call.name, call.args as Record<string, string>)
       steps.push({ tool: call.name, args: call.args as Record<string, unknown>, result: toolResult })
       responses.push({ functionResponse: { name: call.name, response: { result: toolResult } } })
     }
@@ -220,7 +220,7 @@ export async function runActorMatching(actorId: string, actorType: 'partner' | '
 
   let actorProfile: string
   if (actorType === 'partner') {
-    const doc = store.getPartner(actorId)
+    const doc = await store.getPartner(actorId)
     if (!doc) throw new Error(`Partner '${actorId}' not found`)
     const rec = docToPartnerRecord(doc)!
 
@@ -247,7 +247,7 @@ export async function runActorMatching(actorId: string, actorType: 'partner' | '
 
     actorProfile = `Type: ${rec.partnerType}\nOrg: ${rec.orgName}\nIndustry: ${rec.industry}${extra}`
   } else {
-    const doc = store.getInitiative(actorId)
+    const doc = await store.getInitiative(actorId)
     if (!doc) throw new Error(`Initiative '${actorId}' not found`)
     const init = docToInitiative(doc)!
 
@@ -269,7 +269,7 @@ export async function runActorMatching(actorId: string, actorType: 'partner' | '
     actorProfile = `Type: initiative / ${init.type}\nName: ${init.name}\nDescription: ${init.description}\nFocus Industries: ${init.focusIndustries.join(', ')}\nStatus: ${init.status}${extra}`
   }
 
-  const startupList = store.getAllStartups().map(s =>
+  const startupList = (await store.getAllStartups()).map(s =>
     `ID: ${s.startup_id} | ${s.startup_name} | ${s.industry} | ${s.stage} | problem: ${s.problem} | needs: ${(s.needs ?? []).join(', ')}`
   ).join('\n')
 

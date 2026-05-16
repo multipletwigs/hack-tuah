@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { store, docToPartnerRecord } from '@/app/lib/store'
 
 export async function GET() {
-  return Response.json(store.getAllPartners().map(p => docToPartnerRecord(p)))
+  return Response.json((await store.getAllPartners()).map(p => docToPartnerRecord(p)))
 }
 
 export async function POST(request: NextRequest) {
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
   }
 
   const partnerId = `partner_${Math.random().toString(16).slice(2, 10)}`
-  store.savePartner(partnerId, {
+  await store.savePartner(partnerId, {
     partner_id: partnerId,
     org_name: orgName,
     contact_name: contactName,

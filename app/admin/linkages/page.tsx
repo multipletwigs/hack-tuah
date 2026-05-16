@@ -39,7 +39,7 @@ export default function LinkagesPage() {
     const header = ['Startup', 'Actor Type', 'Partner Type', 'Actor Name', 'Match Score', 'Status', 'Date', 'Outcome']
     const rows = filtered.map(l => [
       l.startupName, l.actorType, l.partnerType ?? '', l.actorName,
-      `${l.matchScore}%`, l.status, l.createdAt.slice(0, 10), l.outcome ?? '—',
+      `${l.matchScore}%`, l.status, l.createdAt?.slice(0, 10) ?? '—', l.outcome ?? '—',
     ])
     const csv = [header, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n')
     const a = document.createElement('a')

@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { store, docToInitiative } from '@/app/lib/store'
 
 export async function GET() {
-  return Response.json(store.getAllInitiatives().map(i => docToInitiative(i)!))
+  return Response.json((await store.getAllInitiatives()).map(i => docToInitiative(i)!))
 }
 
 export async function POST(request: NextRequest) {
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
   }
 
   const initiativeId = `init_${Math.random().toString(16).slice(2, 8)}`
-  store.saveInitiative(initiativeId, {
+  await store.saveInitiative(initiativeId, {
     initiative_id: initiativeId,
     name,
     type,
