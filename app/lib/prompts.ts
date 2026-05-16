@@ -27,9 +27,9 @@ Return ONLY a valid JSON object — no markdown, no code fences, no explanations
 The JSON must have exactly these keys:
 - "mentors": array of top 3 mentor matches
 - "programmes": array of top 3 programme matches
-- "corporate_partners": array of top 2 corporate partner matches
-- "investors": array of top 2 investor matches
-- "service_providers": array of top 2 service provider matches
+- "corporate_partners": array of top 3 corporate partner matches
+- "investors": array of top 3 investor matches
+- "service_providers": array of top 3 service provider matches
 
 Each item in every array must have exactly these fields:
 - "actor_id": string — the id field from the source record
