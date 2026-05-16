@@ -1,9 +1,13 @@
 import { NextRequest } from 'next/server'
-import { store } from '@/app/lib/store'
+import { store, docToPartnerRecord } from '@/app/lib/store'
+
+export async function GET() {
+  return Response.json(store.getAllPartners().map(p => docToPartnerRecord(p)))
+}
 
 export async function POST(request: NextRequest) {
   const body = await request.json()
-  const { orgName, contactName, contactEmail, partnerType } = body
+  const { orgName, contactName, contactEmail, partnerType, industry } = body
 
   if (!orgName || !contactName || !contactEmail || !partnerType) {
     return Response.json({ error: 'Missing required fields' }, { status: 422 })
@@ -12,7 +16,11 @@ export async function POST(request: NextRequest) {
   const partnerId = `partner_${Math.random().toString(16).slice(2, 10)}`
   store.savePartner(partnerId, {
     partner_id: partnerId,
-    ...body,
+    org_name: orgName,
+    contact_name: contactName,
+    contact_email: contactEmail,
+    partner_type: partnerType,
+    industry: industry ?? '',
     status: 'pending_review',
     created_at: new Date().toISOString(),
   })

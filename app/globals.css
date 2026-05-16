@@ -231,3 +231,103 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; b
   .card-grid-2 { grid-template-columns: 1fr; }
   .actor-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Admin shell ── */
+.admin-shell { display: flex; min-height: 100vh; }
+.admin-sidebar {
+  width: 240px; background: #1a1a2e; color: #e2e8f0;
+  position: fixed; top: 0; left: 0; bottom: 0;
+  display: flex; flex-direction: column; z-index: 20;
+}
+.sidenav-brand { padding: 1.5rem 1.25rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.sidenav-brand-name { font-size: 1rem; font-weight: 700; color: #fff; }
+.sidenav-brand-sub  { font-size: 0.7rem; color: #475569; margin-top: 0.1rem; }
+.sidenav-nav { flex: 1; padding: 0.75rem 0; overflow-y: auto; }
+.sidenav-section-label {
+  padding: 0.75rem 1.25rem 0.25rem;
+  font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.08em; color: #475569;
+}
+.sidenav-item {
+  display: flex; align-items: center; gap: 0.65rem;
+  padding: 0.6rem 1.25rem; font-size: 0.875rem; color: #94a3b8;
+  text-decoration: none; transition: background 0.1s, color 0.1s;
+}
+.sidenav-item:hover { background: rgba(255,255,255,0.06); color: #e2e8f0; }
+.sidenav-item.active { background: rgba(79,110,247,0.18); color: #818cf8; font-weight: 500; }
+.sidenav-icon { width: 18px; text-align: center; font-size: 0.9rem; flex-shrink: 0; }
+.admin-main { margin-left: 240px; flex: 1; min-height: 100vh; background: #f5f6fa; }
+.admin-content { padding: 2rem 2.5rem; max-width: 1100px; }
+
+/* ── KPI metric cards ── */
+.metric-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1rem; margin-bottom: 2rem; }
+.metric-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 1.1rem 1.25rem; border-top: 3px solid #e2e8f0;
+}
+.metric-card.accent-blue   { border-top-color: #4f6ef7; }
+.metric-card.accent-green  { border-top-color: #16a34a; }
+.metric-card.accent-purple { border-top-color: #9333ea; }
+.metric-card.accent-orange { border-top-color: #ea580c; }
+.metric-label { font-size: 0.7rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem; }
+.metric-value { font-size: 1.75rem; font-weight: 700; color: #1a1a2e; line-height: 1; }
+.metric-sub   { font-size: 0.7rem; color: #94a3b8; margin-top: 0.3rem; }
+
+/* ── Dashboard two-col ── */
+.dash-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+.section-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem 1.5rem; }
+.section-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+.section-card-title { font-size: 0.9rem; font-weight: 600; color: #1a1a2e; }
+
+/* ── Engagement bars ── */
+.engagement-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.55rem 0; border-bottom: 1px solid #f1f5f9; }
+.engagement-row:last-child { border-bottom: none; }
+.engagement-name      { font-size: 0.8rem; font-weight: 500; width: 90px; flex-shrink: 0; }
+.engagement-industry  { font-size: 0.72rem; color: #94a3b8; width: 70px; flex-shrink: 0; }
+.engagement-bar-track { flex: 1; background: #f1f5f9; border-radius: 99px; height: 6px; overflow: hidden; }
+.engagement-bar-fill  { height: 100%; border-radius: 99px; background: linear-gradient(90deg, #4f6ef7, #818cf8); }
+.engagement-score-val { font-size: 0.8rem; font-weight: 700; width: 28px; text-align: right; flex-shrink: 0; }
+.engagement-links-val { font-size: 0.72rem; color: #94a3b8; width: 52px; text-align: right; flex-shrink: 0; }
+
+/* ── Activity feed ── */
+.activity-item { display: flex; gap: 0.75rem; padding: 0.55rem 0; border-bottom: 1px solid #f1f5f9; font-size: 0.8rem; }
+.activity-item:last-child { border-bottom: none; }
+.activity-dot  { width: 7px; height: 7px; border-radius: 50%; background: #4f6ef7; margin-top: 0.4rem; flex-shrink: 0; }
+.activity-body { flex: 1; color: #374151; line-height: 1.4; }
+.activity-meta { color: #94a3b8; font-size: 0.72rem; margin-top: 0.15rem; }
+.activity-date { color: #94a3b8; white-space: nowrap; }
+
+/* ── Management pages ── */
+.mgmt-header     { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+.mgmt-header-left { display: flex; align-items: baseline; gap: 0.75rem; }
+.count-badge     { font-size: 0.75rem; font-weight: 600; background: #eff2ff; color: #4f6ef7; padding: 0.15rem 0.5rem; border-radius: 99px; }
+.mgmt-table-wrap { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+.mgmt-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.mgmt-table th {
+  text-align: left; padding: 0.7rem 1rem; background: #f8fafc;
+  font-weight: 600; color: #374151; border-bottom: 1px solid #e2e8f0;
+  font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.mgmt-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; }
+.mgmt-table tbody tr:last-child td { border-bottom: none; }
+.mgmt-table tbody tr:hover { background: #fafbff; }
+
+/* ── Filter tabs ── */
+.filter-tabs { display: flex; gap: 0.25rem; margin-bottom: 1rem; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.25rem; width: fit-content; }
+.filter-tab { padding: 0.35rem 0.85rem; border-radius: 6px; font-size: 0.8rem; font-weight: 500; cursor: pointer; border: none; background: none; color: #64748b; transition: all 0.1s; }
+.filter-tab.active { background: #4f6ef7; color: #fff; }
+.filter-tab:hover:not(.active) { background: #f1f5f9; }
+
+/* ── Needs chips ── */
+.needs-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.need-chip   { font-size: 0.7rem; padding: 0.1rem 0.45rem; border-radius: 99px; background: #f1f5f9; color: #475569; }
+
+/* ── Matches page ── */
+.match-generate-bar {
+  display: flex; gap: 1rem; align-items: flex-end;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 1.25rem 1.5rem; margin-bottom: 2rem;
+}
+.match-results-section { margin-bottom: 2rem; }
+.match-admin-grid   { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.match-admin-grid-2 { grid-template-columns: repeat(2, 1fr); }

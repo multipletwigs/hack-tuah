@@ -1,7 +1,7 @@
 // In-memory store — process-level singleton, mirrors the Python StubStore.
 // Swap out for Firestore by replacing the methods below.
 
-import type { Linkage } from './types'
+import type { Linkage, Initiative, PartnerRecord } from './types'
 
 interface StartupDoc {
   startup_id: string
@@ -30,6 +30,65 @@ interface LinkageDoc {
   outcome: string | null
 }
 
+interface PartnerDoc {
+  partner_id: string
+  org_name: string
+  contact_name: string
+  contact_email: string
+  partner_type: string
+  industry: string
+  status: string
+  created_at: string
+}
+
+interface InitiativeDoc {
+  initiative_id: string
+  name: string
+  type: string
+  focus_industries: string[]
+  funding_amount: number | null
+  next_intake: string | null
+  status: string
+  created_at: string
+}
+
+function defaultStartups(): Record<string, StartupDoc> {
+  const now = new Date().toISOString()
+  const rows: StartupDoc[] = [
+    { startup_id: 'startup_001', cofounder_name: 'Ahmad Farhan', startup_name: 'PayEase',   industry: 'fintech',    stage: 'seed',     problem: 'Cross-border SME payments are slow and expensive.',      needs: ['mentorship', 'funding', 'pilot partners'], created_at: now },
+    { startup_id: 'startup_002', cofounder_name: 'Dr. Mei Ling', startup_name: 'MediTrack', industry: 'healthtech', stage: 'series-a', problem: 'Patient records are siloed across healthcare providers.', needs: ['funding', 'pilot partners'],               created_at: now },
+    { startup_id: 'startup_003', cofounder_name: 'Raj Kumar',    startup_name: 'EduSync',   industry: 'edtech',     stage: 'pre-seed', problem: 'Personalized learning is inaccessible to most students.', needs: ['mentorship', 'networking'],              created_at: now },
+    { startup_id: 'startup_004', cofounder_name: 'Nurul Ain',    startup_name: 'FarmTrace', industry: 'agritech',   stage: 'seed',     problem: 'Smallholder supply chains lack traceability.',           needs: ['mentorship', 'pilot partners'],           created_at: now },
+  ]
+  return Object.fromEntries(rows.map(r => [r.startup_id, r]))
+}
+
+function defaultPartners(): Record<string, PartnerDoc> {
+  const now = new Date().toISOString()
+  const rows: PartnerDoc[] = [
+    { partner_id: 'partner_001', org_name: 'Mastercard',         contact_name: 'Mastercard Team',    contact_email: 'partnerships@mastercard.com', partner_type: 'corporate',        industry: 'fintech',         status: 'active', created_at: now },
+    { partner_id: 'partner_002', org_name: 'Openspace Ventures', contact_name: 'Openspace Team',     contact_email: 'info@openspace.vc',           partner_type: 'investor',         industry: 'fintech/healthtech', status: 'active', created_at: now },
+    { partner_id: 'partner_003', org_name: 'Wong & Partners',    contact_name: 'Wong & Partners Team', contact_email: 'info@wongpartners.com',     partner_type: 'service_provider', industry: 'legal',           status: 'active', created_at: now },
+    { partner_id: 'partner_004', org_name: 'CIMB Bank',          contact_name: 'CIMB Team',          contact_email: 'partnerships@cimb.com',       partner_type: 'corporate',        industry: 'banking',         status: 'active', created_at: now },
+    { partner_id: 'partner_005', org_name: 'Iterative',          contact_name: 'Iterative Team',     contact_email: 'hello@iterative.vc',          partner_type: 'investor',         industry: 'B2B SaaS',        status: 'active', created_at: now },
+    { partner_id: 'partner_006', org_name: 'AWS Activate',       contact_name: 'AWS Team',           contact_email: 'activate@amazon.com',         partner_type: 'service_provider', industry: 'cloud',           status: 'active', created_at: now },
+    { partner_id: 'mentor_001',  org_name: 'Ahmad Razif',        contact_name: 'Ahmad Razif',        contact_email: 'ahmad.razif@mentor.com',      partner_type: 'mentor',           industry: 'fintech',         status: 'active', created_at: now },
+    { partner_id: 'mentor_002',  org_name: 'Priya Nair',         contact_name: 'Priya Nair',         contact_email: 'priya.nair@mentor.com',       partner_type: 'mentor',           industry: 'B2B SaaS',        status: 'active', created_at: now },
+    { partner_id: 'mentor_003',  org_name: 'David Tan',          contact_name: 'David Tan',          contact_email: 'david.tan@mentor.com',        partner_type: 'mentor',           industry: 'payments',        status: 'active', created_at: now },
+  ]
+  return Object.fromEntries(rows.map(r => [r.partner_id, r]))
+}
+
+function defaultInitiatives(): Record<string, InitiativeDoc> {
+  const now = new Date().toISOString()
+  const rows: InitiativeDoc[] = [
+    { initiative_id: 'init_001', name: 'CIP Accelerate',        type: 'accelerator', focus_industries: ['fintech','healthtech','edtech','agritech'], funding_amount: 500000, next_intake: 'Q3 2026', status: 'active',   created_at: now },
+    { initiative_id: 'init_002', name: 'GAIN Grant',             type: 'grant',       focus_industries: ['fintech','saas','deep tech'],              funding_amount: 150000, next_intake: 'Q2 2026', status: 'active',   created_at: now },
+    { initiative_id: 'init_003', name: 'Tech Startup Catalyst', type: 'incubator',   focus_industries: ['saas','edtech','healthtech'],              funding_amount: 250000, next_intake: 'Q4 2026', status: 'active',   created_at: now },
+  ]
+  return Object.fromEntries(rows.map(r => [r.initiative_id, r]))
+}
+
 function defaultLinkages(): Record<string, LinkageDoc> {
   const now = new Date().toISOString()
   const rows: LinkageDoc[] = [
@@ -45,9 +104,10 @@ function defaultLinkages(): Record<string, LinkageDoc> {
 }
 
 class InMemoryStore {
-  private startups: Record<string, StartupDoc> = {}
+  private startups: Record<string, StartupDoc> = defaultStartups()
   private linkages: Record<string, LinkageDoc> = defaultLinkages()
-  private partners: Record<string, object> = {}
+  private partners: Record<string, PartnerDoc> = defaultPartners()
+  private initiatives: Record<string, InitiativeDoc> = defaultInitiatives()
 
   saveStartup(id: string, doc: StartupDoc) {
     this.startups[id] = doc
@@ -79,8 +139,28 @@ class InMemoryStore {
     return this.linkages[id]
   }
 
-  savePartner(id: string, doc: object) {
+  savePartner(id: string, doc: PartnerDoc) {
     this.partners[id] = doc
+  }
+
+  getPartner(id: string): PartnerDoc | null {
+    return this.partners[id] ?? null
+  }
+
+  getAllPartners(): PartnerDoc[] {
+    return Object.values(this.partners)
+  }
+
+  getAllInitiatives(): InitiativeDoc[] {
+    return Object.values(this.initiatives)
+  }
+
+  getInitiative(id: string): InitiativeDoc | null {
+    return this.initiatives[id] ?? null
+  }
+
+  saveInitiative(id: string, doc: InitiativeDoc) {
+    this.initiatives[id] = doc
   }
 }
 
@@ -105,5 +185,33 @@ export function docToLinkage(doc: LinkageDoc): Linkage {
     programmeCycle: doc.programme_cycle,
     createdAt: doc.created_at,
     outcome: doc.outcome,
+  }
+}
+
+export function docToPartnerRecord(doc: ReturnType<InMemoryStore['getPartner']>): PartnerRecord | null {
+  if (!doc) return null
+  return {
+    partnerId: doc.partner_id,
+    orgName: doc.org_name,
+    contactName: doc.contact_name,
+    contactEmail: doc.contact_email,
+    partnerType: doc.partner_type as PartnerRecord['partnerType'],
+    industry: doc.industry,
+    status: doc.status as PartnerRecord['status'],
+    createdAt: doc.created_at,
+  }
+}
+
+export function docToInitiative(doc: ReturnType<InMemoryStore['getInitiative']>): Initiative | null {
+  if (!doc) return null
+  return {
+    initiativeId: doc.initiative_id,
+    name: doc.name,
+    type: doc.type as Initiative['type'],
+    focusIndustries: doc.focus_industries,
+    fundingAmount: doc.funding_amount,
+    nextIntake: doc.next_intake,
+    status: doc.status as Initiative['status'],
+    createdAt: doc.created_at,
   }
 }

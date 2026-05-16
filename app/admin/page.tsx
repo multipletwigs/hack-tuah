@@ -1,111 +1,120 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import Nav from '@/app/components/Nav'
-import LinkageTable from '@/app/components/LinkageTable'
-import type { Linkage, ActorType, PartnerType } from '@/app/lib/types'
+import Link from 'next/link'
+import StatusBadge from '@/app/components/StatusBadge'
+import type { Linkage } from '@/app/lib/types'
 
-interface Filters {
-  actorType: ActorType | ''
-  partnerType: PartnerType | ''
-  startup: string
-  status: string
+interface EngagementEntry {
+  startupId: string
+  startupName: string
+  industry: string
+  stage: string
+  score: number
+  activeLinks: number
+  totalLinks: number
+}
+
+interface Stats {
+  counts: { startups: number; partners: number; mentors: number; initiatives: number; activeLinks: number; pendingLinks: number }
+  avgMatchScore: number
+  engagementScores: EngagementEntry[]
+  recentLinkages: Linkage[]
+}
+
+function MetricCard({ label, value, sub, accent }: { label: string; value: string | number; sub?: string; accent?: string }) {
+  return (
+    <div className={`metric-card${accent ? ` accent-${accent}` : ''}`}>
+      <div className="metric-label">{label}</div>
+      <div className="metric-value">{value}</div>
+      {sub && <div className="metric-sub">{sub}</div>}
+    </div>
+  )
 }
 
 export default function AdminDashboard() {
-  const router = useRouter()
-  const [linkages, setLinkages] = useState<Linkage[]>([])
+  const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [filters, setFilters] = useState<Filters>({ actorType: '', partnerType: '', startup: '', status: '' })
 
   useEffect(() => {
-    fetch('/api/linkages')
+    fetch('/api/admin/stats')
       .then(r => r.json())
-      .then(data => { setLinkages(data); setLoading(false) })
-      .catch(err => { setError(err.message); setLoading(false) })
+      .then(data => { setStats(data); setLoading(false) })
+      .catch(() => setLoading(false))
   }, [])
 
-  function handleFilter(field: keyof Filters, value: string) {
-    setFilters(f => ({ ...f, [field]: value }))
+  if (loading) {
+    return <div className="admin-content"><div className="empty-state" style={{ marginTop: '4rem' }}>Loading…</div></div>
+  }
+  if (!stats) {
+    return <div className="admin-content"><div className="empty-state">Failed to load stats.</div></div>
   }
 
-  const filtered = linkages.filter(l =>
-    (!filters.actorType   || l.actorType === filters.actorType) &&
-    (!filters.partnerType || l.partnerType === filters.partnerType) &&
-    (!filters.startup     || l.startupName.toLowerCase().includes(filters.startup.toLowerCase())) &&
-    (!filters.status      || l.status === filters.status)
-  )
-
-  function exportCSV() {
-    const header = ['Startup', 'Actor Type', 'Partner Type', 'Actor Name', 'Match Score', 'Status', 'Date', 'Outcome']
-    const rows = filtered.map(l => [
-      l.startupName, l.actorType, l.partnerType ?? '', l.actorName,
-      `${l.matchScore}%`, l.status, l.createdAt.slice(0, 10), l.outcome ?? '—',
-    ])
-    const csv = [header, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n')
-    const a = document.createElement('a')
-    a.href = 'data:text/csv,' + encodeURIComponent(csv)
-    a.download = 'linkages.csv'
-    a.click()
-  }
+  const { counts, avgMatchScore, engagementScores, recentLinkages } = stats
 
   return (
-    <>
-      <Nav rightLabel="+ New Submission" rightHref="/" />
-      <main className="container">
-        <div className="results-header">
-          <div>
-            <h1 className="page-title">Linkage Dashboard</h1>
-            <p className="page-subtitle">All confirmed matches across mentors, programmes, and partners.</p>
+    <div className="admin-content">
+      <div className="mgmt-header" style={{ marginBottom: '1.5rem' }}>
+        <div>
+          <h1 className="page-title">Ecosystem Dashboard</h1>
+          <p className="page-subtitle">Live view of the Cradle startup ecosystem.</p>
+        </div>
+        <Link href="/admin/matches" className="btn btn-primary" style={{ textDecoration: 'none' }}>
+          ✨ Generate Matches
+        </Link>
+      </div>
+
+      <div className="metric-grid">
+        <MetricCard label="Startups" value={counts.startups} sub="enrolled" accent="blue" />
+        <MetricCard label="Partners" value={counts.partners} sub="active" accent="orange" />
+        <MetricCard label="Mentors" value={counts.mentors} sub="active" accent="purple" />
+        <MetricCard label="Initiatives" value={counts.initiatives} sub="running" accent="green" />
+        <MetricCard label="Active Linkages" value={counts.activeLinks} sub={`${counts.pendingLinks} pending`} />
+        <MetricCard label="Avg Match Score" value={`${avgMatchScore}%`} sub="across active links" accent="blue" />
+      </div>
+
+      <div className="dash-two-col">
+        <div className="section-card">
+          <div className="section-card-header">
+            <span className="section-card-title">Engagement Scores</span>
+            <Link href="/admin/startups" style={{ fontSize: '0.78rem', color: '#4f6ef7', textDecoration: 'none' }}>View all →</Link>
           </div>
-          <button className="btn btn-secondary" onClick={exportCSV}>Export CSV</button>
+          {engagementScores.length === 0
+            ? <div className="empty-state" style={{ padding: '1rem 0' }}>No engagement data yet.</div>
+            : engagementScores.map(e => (
+              <div key={e.startupId} className="engagement-row">
+                <span className="engagement-name">{e.startupName}</span>
+                <span className="engagement-industry">{e.industry}</span>
+                <div className="engagement-bar-track">
+                  <div className="engagement-bar-fill" style={{ width: `${e.score}%` }} />
+                </div>
+                <span className="engagement-score-val">{e.score}</span>
+                <span className="engagement-links-val">{e.activeLinks}/{e.totalLinks}</span>
+              </div>
+            ))
+          }
         </div>
 
-        <section className="filters-bar">
-          <div className="filter-group">
-            <label htmlFor="f-actor">Actor Type</label>
-            <select id="f-actor" value={filters.actorType} onChange={e => handleFilter('actorType', e.target.value)}>
-              <option value="">All</option>
-              <option value="mentor">Mentor</option>
-              <option value="programme">Programme</option>
-              <option value="partner">Partner</option>
-            </select>
+        <div className="section-card">
+          <div className="section-card-header">
+            <span className="section-card-title">Recent Activity</span>
+            <Link href="/admin/linkages" style={{ fontSize: '0.78rem', color: '#4f6ef7', textDecoration: 'none' }}>View all →</Link>
           </div>
-          <div className="filter-group">
-            <label htmlFor="f-partner">Partner Type</label>
-            <select id="f-partner" value={filters.partnerType} onChange={e => handleFilter('partnerType', e.target.value)}>
-              <option value="">All</option>
-              <option value="corporate">Corporate</option>
-              <option value="investor">Investor</option>
-              <option value="service_provider">Service Provider</option>
-            </select>
-          </div>
-          <div className="filter-group">
-            <label htmlFor="f-startup">Startup Name</label>
-            <input id="f-startup" type="text" placeholder="Search startup…" value={filters.startup} onChange={e => handleFilter('startup', e.target.value)} />
-          </div>
-          <div className="filter-group">
-            <label htmlFor="f-status">Status</label>
-            <select id="f-status" value={filters.status} onChange={e => handleFilter('status', e.target.value)}>
-              <option value="">All</option>
-              <option value="active">Active</option>
-              <option value="pending">Pending</option>
-              <option value="closed">Closed</option>
-            </select>
-          </div>
-        </section>
-
-        {error && <p className="field-error visible" style={{ marginBottom: '1rem' }}>{error}</p>}
-
-        <section className="table-section">
-          {loading
-            ? <div className="empty-state">Loading linkages…</div>
-            : <LinkageTable linkages={filtered} />
+          {recentLinkages.length === 0
+            ? <div className="empty-state" style={{ padding: '1rem 0' }}>No recent activity.</div>
+            : recentLinkages.map(l => (
+              <div key={l.linkageId} className="activity-item">
+                <div className="activity-dot" />
+                <div className="activity-body">
+                  <strong>{l.startupName}</strong> → {l.actorName}
+                  <div className="activity-meta"><StatusBadge status={l.status} /> · {l.actorType}</div>
+                </div>
+                <span className="activity-date">{l.createdAt.slice(0, 10)}</span>
+              </div>
+            ))
           }
-        </section>
-      </main>
-    </>
+        </div>
+      </div>
+    </div>
   )
 }
