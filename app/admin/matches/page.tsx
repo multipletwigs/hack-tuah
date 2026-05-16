@@ -506,7 +506,7 @@ export default function MatchesPage() {
   }
 
   async function generate(id: string, kind: GraphNodeKind) {
-    if (!id || id === 'matcher') return
+    if (!id || id === 'matcher' || loading) return
     setSelectedId(id)
     setSelectedKind(kind)
     setSelectedNodeId(id)
@@ -594,6 +594,14 @@ export default function MatchesPage() {
       ].filter(s => s.entries.length > 0)
 
   const canConfirmMatch = () => true
+  const generatedMatchCount = result
+    ? result.startups.length +
+      result.mentors.length +
+      result.corporatePartners.length +
+      result.investors.length +
+      result.serviceProviders.length +
+      result.initiatives.length
+    : 0
 
   return (
     <div className="admin-content matching-network-page">
@@ -684,6 +692,14 @@ export default function MatchesPage() {
                 </div>
               )}
             </div>
+
+            {result && !loading && (
+              <div className="match-usage-strip" aria-label="Matching submission usage">
+                <span><strong>{result.modelCalls}</strong> Gemini calls</span>
+                <span><strong>{result.steps.length}</strong> tool calls</span>
+                <span><strong>{generatedMatchCount}</strong> matches returned</span>
+              </div>
+            )}
 
             {!result && !loading && (
               <p className="network-empty" style={{ padding: '1.5rem 0' }}>

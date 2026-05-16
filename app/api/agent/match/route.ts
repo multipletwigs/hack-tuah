@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { runMatchingAgent, runActorMatching } from '@/app/lib/matching-agent'
+import { geminiBackendInfo } from '@/app/lib/vertex'
 
 export async function POST(request: NextRequest) {
   const requestId = crypto.randomUUID()
@@ -12,6 +13,7 @@ export async function POST(request: NextRequest) {
     startupId,
     actorId,
     actorType,
+    gemini: geminiBackendInfo(),
   })
 
   try {
@@ -42,6 +44,7 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error('[matching-api] error', {
       requestId,
+      gemini: geminiBackendInfo(),
       error: err instanceof Error ? err.message : String(err),
     })
     return Response.json({ error: err instanceof Error ? err.message : 'Agent failed' }, { status: 500 })

@@ -24,6 +24,15 @@ function normalizeSchemaTypes(value: unknown): unknown {
 export const GEMINI_MODEL = env('GEMINI_MODEL')
   ?? (env('GEMINI_API_KEY') ? GOOGLE_AI_MODEL : VERTEX_MODEL)
 
+export function geminiBackendInfo() {
+  return {
+    backend: env('GEMINI_API_KEY') ? 'google-ai-studio' : 'vertex-ai',
+    model: GEMINI_MODEL,
+    vertexProjectConfigured: Boolean(env('VERTEX_PROJECT')),
+    vertexLocation: env('VERTEX_LOCATION') ?? 'us-central1',
+  }
+}
+
 // Returns a model from whichever backend is configured:
 //   GEMINI_API_KEY  → Google AI Studio (original)
 //   VERTEX_PROJECT  → Vertex AI (GCP)

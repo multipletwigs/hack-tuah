@@ -20,6 +20,7 @@ export interface MatchEntry {
 
 export interface AgentMatchResult {
   steps: AgentStep[]
+  modelCalls: number
   mentors: MatchEntry[]
   corporatePartners: MatchEntry[]
   investors: MatchEntry[]
@@ -27,6 +28,10 @@ export interface AgentMatchResult {
   initiatives: MatchEntry[]
   startups: MatchEntry[]
   direction: 'from-startup' | 'from-actor'
+}
+
+type GeminiResult = {
+  response: unknown
 }
 
 function preview(value: string, limit = 700): string {
@@ -46,6 +51,56 @@ function summarizeToolResult(result: unknown): Record<string, unknown> {
 
 function logAgent(requestId: string, event: string, data: Record<string, unknown> = {}) {
   console.info('[matching-agent]', { requestId, event, ...data })
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function isRetryableGeminiError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err)
+  return (
+    message.includes('[429 Too Many Requests]') ||
+    message.includes('Quota exceeded') ||
+    message.includes('[503 Service Unavailable]') ||
+    message.includes('experiencing high demand')
+  )
+}
+
+function retryDelayMs(err: unknown, attempt: number): number {
+  const message = err instanceof Error ? err.message : String(err)
+  const retryInfo = message.match(/"retryDelay":"(\d+(?:\.\d+)?)s"/)
+  const retryText = message.match(/retry in (\d+(?:\.\d+)?)s/i)
+  const seconds = Number(retryInfo?.[1] ?? retryText?.[1])
+  if (Number.isFinite(seconds) && seconds > 0) {
+    return Math.min(30_000, Math.ceil(seconds * 1000))
+  }
+  const jitterMs = Math.floor(Math.random() * 500)
+  return Math.min(30_000, 1500 * 2 ** attempt + jitterMs)
+}
+
+async function withGeminiRetry<T>(
+  requestId: string,
+  label: string,
+  call: () => Promise<T>,
+  maxAttempts = 3,
+): Promise<T> {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      return await call()
+    } catch (err) {
+      if (!isRetryableGeminiError(err) || attempt === maxAttempts - 1) throw err
+      const delayMs = retryDelayMs(err, attempt)
+      logAgent(requestId, 'model-retry', {
+        label,
+        attempt: attempt + 1,
+        nextAttempt: attempt + 2,
+        delayMs,
+      })
+      await sleep(delayMs)
+    }
+  }
+  return call()
 }
 
 function relevantLinkageRecords(actorId: string): Array<Record<string, unknown>> {
@@ -267,87 +322,97 @@ For each match_reason (exactly 2 sentences):
 Score range: 60–100. Be selective — only include actors with genuine alignment.`
 
 export async function runMatchingAgent(startupId: string, requestId = crypto.randomUUID()): Promise<AgentMatchResult> {
-  const model = getModel(TOOL_DECLARATIONS)
-  const firstMessage = `Find ecosystem matches for startup ID: ${startupId}. Begin by fetching the startup profile.`
+  const profileResult = executeTool('get_startup_profile', { startup_id: startupId }) as Record<string, unknown>
+  const startup = profileResult.startup as Record<string, unknown> | undefined
+  if (!startup || profileResult.error) throw new Error(`Startup '${startupId}' not found`)
+
+  const mentors = partnerCandidateRecords('mentor')
+  const corporatePartners = partnerCandidateRecords('corporate')
+  const investors = partnerCandidateRecords('investor')
+  const serviceProviders = partnerCandidateRecords('service_provider')
+  const initiatives = initiativeCandidateRecords()
+  const steps: AgentStep[] = [
+    { tool: 'get_startup_profile', args: { startup_id: startupId }, result: profileResult },
+    { tool: 'load_mentor_candidates', args: {}, result: { mentors } },
+    { tool: 'load_corporate_candidates', args: {}, result: { partners: corporatePartners } },
+    { tool: 'load_investor_candidates', args: {}, result: { partners: investors } },
+    { tool: 'load_service_provider_candidates', args: {}, result: { partners: serviceProviders } },
+    { tool: 'load_initiative_candidates', args: {}, result: { initiatives } },
+  ]
+
+  const candidates = {
+    mentors,
+    corporate_partners: corporatePartners,
+    investors,
+    service_providers: serviceProviders,
+    initiatives,
+  }
+
+  const prompt = `${SYSTEM_PROMPT}
+
+STARTUP PROFILE:
+${JSON.stringify(startup, null, 2)}
+
+EXISTING LINKAGES:
+${JSON.stringify(profileResult.existing_linkages ?? [], null, 2)}
+
+AVAILABLE CANDIDATES:
+${JSON.stringify(candidates, null, 2)}
+
+Return JSON only (no markdown fences) with this exact shape:
+{
+  "mentors": [],
+  "corporate_partners": [],
+  "investors": [],
+  "service_providers": [],
+  "initiatives": []
+}
+
+Each item must have actor_id, actor_name, match_score, and match_reason.
+Return exactly min(3, candidate_count) per category unless the category has no credible matches. Rank by concrete value fit, not just industry similarity.`
 
   logAgent(requestId, 'startup-agent-start', {
     startupId,
     systemPromptLength: SYSTEM_PROMPT.length,
-    firstMessage,
-    tools: TOOL_DECLARATIONS.map(tool => tool.name),
+    promptLength: prompt.length,
+    tools: steps.map(step => step.tool),
+    candidateCounts: Object.fromEntries(Object.entries(candidates).map(([key, value]) => [key, value.length])),
   })
 
-  const chat = model.startChat({
-    history: [
-      { role: 'user',  parts: [{ text: SYSTEM_PROMPT }] },
-      { role: 'model', parts: [{ text: 'Understood. I will fetch the startup profile first, then search for relevant ecosystem actors before submitting matches.' }] },
-    ],
+  const model = getModel()
+  logAgent(requestId, 'model-call', { call: 1, kind: 'startup-generate-content' })
+  const res = await withGeminiRetry<GeminiResult>(
+    requestId,
+    'startup-generate-content',
+    async () => model.generateContent(prompt) as Promise<GeminiResult>,
+  )
+  const text = responseText(res.response).replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+  logAgent(requestId, 'model-response', {
+    call: 1,
+    textLength: text.length,
+    textPreview: preview(text),
   })
-
-  const steps: AgentStep[] = []
-  logAgent(requestId, 'model-call', { call: 1, kind: 'initial-chat' })
-  let modelCallCount = 1
-  let result = await chat.sendMessage(firstMessage)
-
-  for (let i = 0; i < 10; i++) {
-    const calls = responseFunctionCalls(result.response)
-    logAgent(requestId, 'model-response', {
-      call: modelCallCount,
-      loop: i,
-      functionCalls: calls?.map(call => call.name) ?? [],
-      textPreview: preview(responseText(result.response)),
-    })
-
-    if (!calls || calls.length === 0) break
-
-    const responses = []
-
-    for (const call of calls) {
-      if (call.name === 'submit_matches') {
-        const args = call.args as Record<string, Array<Record<string, unknown>>>
-        logAgent(requestId, 'submit-matches', {
-          modelCalls: modelCallCount,
-          steps: steps.length,
-          mentors: args.mentors?.length ?? 0,
-          corporatePartners: args.corporate_partners?.length ?? 0,
-          investors: args.investors?.length ?? 0,
-          serviceProviders: args.service_providers?.length ?? 0,
-          initiatives: args.initiatives?.length ?? 0,
-        })
-        return {
-          steps,
-          direction:         'from-startup' as const,
-          startups:          [],
-          mentors:           (args.mentors           ?? []).map(x => toEntry(x, 'mentor',     null)),
-          corporatePartners: (args.corporate_partners ?? []).map(x => toEntry(x, 'partner',    'corporate')),
-          investors:         (args.investors          ?? []).map(x => toEntry(x, 'partner',    'investor')),
-          serviceProviders:  (args.service_providers  ?? []).map(x => toEntry(x, 'partner',    'service_provider')),
-          initiatives:       (args.initiatives        ?? []).map(x => toEntry(x, 'initiative', null)),
-        }
-      }
-
-      const toolResult = executeTool(call.name, call.args as Record<string, string>)
-      logAgent(requestId, 'tool-call', {
-        loop: i,
-        tool: call.name,
-        args: call.args,
-        result: summarizeToolResult(toolResult),
-      })
-      steps.push({ tool: call.name, args: call.args as Record<string, unknown>, result: toolResult })
-      responses.push({ functionResponse: { name: call.name, response: { result: toolResult } } })
-    }
-
-    modelCallCount += 1
-    logAgent(requestId, 'model-call', {
-      call: modelCallCount,
-      kind: 'tool-response-chat',
-      toolResponses: responses.map(response => response.functionResponse.name),
-    })
-    result = await chat.sendMessage(responses)
+  const parsed = JSON.parse(text)
+  logAgent(requestId, 'submit-matches', {
+    modelCalls: 1,
+    steps: steps.length,
+    mentors: parsed.mentors?.length ?? 0,
+    corporatePartners: parsed.corporate_partners?.length ?? 0,
+    investors: parsed.investors?.length ?? 0,
+    serviceProviders: parsed.service_providers?.length ?? 0,
+    initiatives: parsed.initiatives?.length ?? 0,
+  })
+  return {
+    steps,
+    modelCalls: 1,
+    direction:         'from-startup' as const,
+    startups:          [],
+    mentors:           (parsed.mentors            ?? []).map((x: Record<string, unknown>) => toEntry(x, 'mentor',     null)),
+    corporatePartners: (parsed.corporate_partners ?? []).map((x: Record<string, unknown>) => toEntry(x, 'partner',    'corporate')),
+    investors:         (parsed.investors          ?? []).map((x: Record<string, unknown>) => toEntry(x, 'partner',    'investor')),
+    serviceProviders:  (parsed.service_providers  ?? []).map((x: Record<string, unknown>) => toEntry(x, 'partner',    'service_provider')),
+    initiatives:       (parsed.initiatives        ?? []).map((x: Record<string, unknown>) => toEntry(x, 'initiative', null)),
   }
-
-  logAgent(requestId, 'startup-agent-empty-result', { modelCalls: modelCallCount, steps: steps.length })
-  return { steps, direction: 'from-startup' as const, startups: [], mentors: [], corporatePartners: [], investors: [], serviceProviders: [], initiatives: [] }
 }
 
 export async function runActorMatching(actorId: string, actorType: 'partner' | 'initiative', requestId = crypto.randomUUID()): Promise<AgentMatchResult> {
@@ -482,7 +547,11 @@ Rules:
 
   const model = getModel()
   logAgent(requestId, 'model-call', { call: 1, kind: 'actor-generate-content' })
-  const res = await model.generateContent(prompt)
+  const res = await withGeminiRetry<GeminiResult>(
+    requestId,
+    'actor-generate-content',
+    async () => model.generateContent(prompt) as Promise<GeminiResult>,
+  )
   const text = responseText(res.response).replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
   logAgent(requestId, 'model-response', {
     call: 1,
@@ -492,6 +561,7 @@ Rules:
   const parsed = JSON.parse(text)
   return {
     steps: [],
+    modelCalls: 1,
     direction: 'from-actor' as const,
     startups: (parsed.startups ?? []).map((x: Record<string, unknown>) => toEntry(x, 'startup', null)),
     mentors: (parsed.mentors ?? []).map((x: Record<string, unknown>) => toEntry(x, 'mentor', null)),
