@@ -1,4 +1,4 @@
-import { db } from './firebase'
+import { getDb } from './firebase'
 import type { Linkage, Initiative, PartnerRecord } from './types'
 
 function tsToISO(val: unknown): string {
@@ -66,38 +66,38 @@ export interface InitiativeDoc {
 export const store = {
   // --- Startups ---
   async saveStartup(id: string, doc: StartupDoc) {
-    await db.collection('startups').doc(id).set(doc)
+    await getDb().collection('startups').doc(id).set(doc)
   },
 
   async getStartup(id: string): Promise<StartupDoc | null> {
-    const snap = await db.collection('startups').doc(id).get()
+    const snap = await getDb().collection('startups').doc(id).get()
     if (!snap.exists) return null
     const d = snap.data() as StartupDoc
     return { ...d, created_at: tsToISO(d.created_at) }
   },
 
   async getAllStartups(): Promise<StartupDoc[]> {
-    const snap = await db.collection('startups').get()
+    const snap = await getDb().collection('startups').get()
     return snap.docs.map(d => { const s = d.data() as StartupDoc; return { ...s, created_at: tsToISO(s.created_at) } })
   },
 
   // --- Linkages ---
   async saveLinkage(doc: LinkageDoc) {
-    await db.collection('linkages').doc(doc.linkage_id).set(doc)
+    await getDb().collection('linkages').doc(doc.linkage_id).set(doc)
   },
 
   async getLinkage(id: string): Promise<LinkageDoc | null> {
-    const snap = await db.collection('linkages').doc(id).get()
+    const snap = await getDb().collection('linkages').doc(id).get()
     return snap.exists ? (snap.data() as LinkageDoc) : null
   },
 
   async getAllLinkages(): Promise<LinkageDoc[]> {
-    const snap = await db.collection('linkages').get()
+    const snap = await getDb().collection('linkages').get()
     return snap.docs.map(d => d.data() as LinkageDoc)
   },
 
   async updateLinkage(id: string, updates: Partial<LinkageDoc>): Promise<LinkageDoc | null> {
-    const ref = db.collection('linkages').doc(id)
+    const ref = getDb().collection('linkages').doc(id)
     const snap = await ref.get()
     if (!snap.exists) return null
     await ref.update(updates as Record<string, unknown>)
@@ -107,21 +107,21 @@ export const store = {
 
   // --- Partners ---
   async savePartner(id: string, doc: PartnerDoc) {
-    await db.collection('partners').doc(id).set(doc)
+    await getDb().collection('partners').doc(id).set(doc)
   },
 
   async getPartner(id: string): Promise<PartnerDoc | null> {
-    const snap = await db.collection('partners').doc(id).get()
+    const snap = await getDb().collection('partners').doc(id).get()
     return snap.exists ? (snap.data() as PartnerDoc) : null
   },
 
   async getAllPartners(): Promise<PartnerDoc[]> {
-    const snap = await db.collection('partners').get()
+    const snap = await getDb().collection('partners').get()
     return snap.docs.map(d => d.data() as PartnerDoc)
   },
 
   async deletePartner(id: string): Promise<boolean> {
-    const ref = db.collection('partners').doc(id)
+    const ref = getDb().collection('partners').doc(id)
     const snap = await ref.get()
     if (!snap.exists) return false
     await ref.delete()
@@ -130,16 +130,16 @@ export const store = {
 
   // --- Initiatives ---
   async saveInitiative(id: string, doc: InitiativeDoc) {
-    await db.collection('initiatives').doc(id).set(doc)
+    await getDb().collection('initiatives').doc(id).set(doc)
   },
 
   async getInitiative(id: string): Promise<InitiativeDoc | null> {
-    const snap = await db.collection('initiatives').doc(id).get()
+    const snap = await getDb().collection('initiatives').doc(id).get()
     return snap.exists ? (snap.data() as InitiativeDoc) : null
   },
 
   async getAllInitiatives(): Promise<InitiativeDoc[]> {
-    const snap = await db.collection('initiatives').get()
+    const snap = await getDb().collection('initiatives').get()
     return snap.docs.map(d => d.data() as InitiativeDoc)
   },
 }

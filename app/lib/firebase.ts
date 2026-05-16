@@ -1,13 +1,27 @@
 import * as admin from 'firebase-admin'
 
-if (!admin.apps.length) {
-  admin.initializeApp({
+function requiredEnv(name: string): string {
+  const value = process.env[name]
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`)
+  }
+  return value
+}
+
+function getFirebaseApp() {
+  if (admin.apps.length) {
+    return admin.app()
+  }
+
+  return admin.initializeApp({
     credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      projectId: requiredEnv('FIREBASE_PROJECT_ID'),
+      clientEmail: requiredEnv('FIREBASE_CLIENT_EMAIL'),
+      privateKey: requiredEnv('FIREBASE_PRIVATE_KEY').replace(/\\n/g, '\n'),
     }),
   })
 }
 
-export const db = admin.firestore()
+export function getDb() {
+  return getFirebaseApp().firestore()
+}

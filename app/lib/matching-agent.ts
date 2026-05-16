@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { getModel, responseText } from './vertex'
+import { getStructuredModel, responseText } from './vertex'
 import { store, docToPartnerRecord, docToInitiative, docToLinkage } from './store'
 
 export interface AgentStep {
@@ -173,6 +173,44 @@ function toEntry(
   }
 }
 
+function fallbackReason(startup: Record<string, unknown>, candidate: Record<string, unknown>): string {
+  const startupName = String(startup.startup_name ?? 'the startup')
+  const actorName = String(candidate.actor_name ?? 'This actor')
+  const category = String(candidate.industry ?? candidate.type ?? candidate.partner_type ?? 'ecosystem')
+  return `${actorName} is a relevant ${category} ecosystem candidate for ${startupName}'s current stage and needs. ${startupName} offers a practical opportunity to validate fit through a targeted partnership conversation.`
+}
+
+function fillEntries(
+  parsedItems: unknown,
+  candidates: Array<Record<string, unknown>>,
+  startup: Record<string, unknown>,
+  actorType: MatchEntry['actorType'],
+  partnerType: string | null,
+): MatchEntry[] {
+  const wanted = Math.min(3, candidates.length)
+  const entries = (Array.isArray(parsedItems) ? parsedItems : [])
+    .map(item => toEntry(item as Record<string, unknown>, actorType, partnerType))
+    .filter(item => item.actorId)
+  const seen = new Set(entries.map(item => item.actorId))
+
+  for (const candidate of candidates) {
+    if (entries.length >= wanted) break
+    const actorId = String(candidate.actor_id ?? '')
+    if (!actorId || seen.has(actorId)) continue
+    entries.push({
+      actorId,
+      actorName: String(candidate.actor_name ?? actorId),
+      actorType,
+      partnerType,
+      matchScore: 70,
+      matchReason: fallbackReason(startup, candidate),
+    })
+    seen.add(actorId)
+  }
+
+  return entries.slice(0, wanted)
+}
+
 async function startupCandidateRecords(excludeId?: string): Promise<Array<Record<string, unknown>>> {
   const startups = await store.getAllStartups()
   return startups
@@ -300,7 +338,7 @@ Return JSON only (no markdown fences) with this exact shape:
 }
 
 Each item must have actor_id, actor_name, match_score, and match_reason.
-Return exactly min(3, candidate_count) per category unless the category has no credible matches. Rank by concrete value fit, not just industry similarity.`
+Return exactly min(3, candidate_count) per category. Do not omit lower-confidence candidates when candidates exist; use a lower score and explain the weaker fit. Rank by concrete value fit, not just industry similarity.`
 
   logAgent(requestId, 'startup-agent-start', {
     startupId,
@@ -308,9 +346,13 @@ Return exactly min(3, candidate_count) per category unless the category has no c
     promptLength: prompt.length,
     tools: steps.map(step => step.tool),
     candidateCounts: Object.fromEntries(Object.entries(candidates).map(([key, value]) => [key, value.length])),
+    candidateIds: Object.fromEntries(Object.entries(candidates).map(([key, value]) => [
+      key,
+      value.map(item => item.actor_id),
+    ])),
   })
 
-  const model = getModel()
+  const model = getStructuredModel()
   logAgent(requestId, 'model-call', { call: 1, kind: 'startup-generate-content' })
   const res = await withGeminiRetry<GeminiResult>(
     requestId,
@@ -324,25 +366,37 @@ Return exactly min(3, candidate_count) per category unless the category has no c
     textPreview: preview(text),
   })
   const parsed = JSON.parse(text)
+  const mentorMatches = fillEntries(parsed.mentors, mentors, startup, 'mentor', null)
+  const corporateMatches = fillEntries(parsed.corporate_partners, corporatePartners, startup, 'partner', 'corporate')
+  const investorMatches = fillEntries(parsed.investors, investors, startup, 'partner', 'investor')
+  const serviceProviderMatches = fillEntries(parsed.service_providers, serviceProviders, startup, 'partner', 'service_provider')
+  const initiativeMatches = fillEntries(parsed.initiatives, initiatives, startup, 'initiative', null)
   logAgent(requestId, 'submit-matches', {
     modelCalls: 1,
     steps: steps.length,
-    mentors: parsed.mentors?.length ?? 0,
-    corporatePartners: parsed.corporate_partners?.length ?? 0,
-    investors: parsed.investors?.length ?? 0,
-    serviceProviders: parsed.service_providers?.length ?? 0,
-    initiatives: parsed.initiatives?.length ?? 0,
+    rawCounts: {
+      mentors: parsed.mentors?.length ?? 0,
+      corporatePartners: parsed.corporate_partners?.length ?? 0,
+      investors: parsed.investors?.length ?? 0,
+      serviceProviders: parsed.service_providers?.length ?? 0,
+      initiatives: parsed.initiatives?.length ?? 0,
+    },
+    mentors: mentorMatches.length,
+    corporatePartners: corporateMatches.length,
+    investors: investorMatches.length,
+    serviceProviders: serviceProviderMatches.length,
+    initiatives: initiativeMatches.length,
   })
   return {
     steps,
     modelCalls: 1,
     direction:         'from-startup' as const,
     startups:          [],
-    mentors:           (parsed.mentors            ?? []).map((x: Record<string, unknown>) => toEntry(x, 'mentor',     null)),
-    corporatePartners: (parsed.corporate_partners ?? []).map((x: Record<string, unknown>) => toEntry(x, 'partner',    'corporate')),
-    investors:         (parsed.investors          ?? []).map((x: Record<string, unknown>) => toEntry(x, 'partner',    'investor')),
-    serviceProviders:  (parsed.service_providers  ?? []).map((x: Record<string, unknown>) => toEntry(x, 'partner',    'service_provider')),
-    initiatives:       (parsed.initiatives        ?? []).map((x: Record<string, unknown>) => toEntry(x, 'initiative', null)),
+    mentors:           mentorMatches,
+    corporatePartners: corporateMatches,
+    investors:         investorMatches,
+    serviceProviders:  serviceProviderMatches,
+    initiatives:       initiativeMatches,
   }
 }
 
@@ -492,7 +546,7 @@ Rules:
     promptPreview: preview(prompt),
   })
 
-  const model = getModel()
+  const model = getStructuredModel()
   logAgent(requestId, 'model-call', { call: 1, kind: 'actor-generate-content' })
   const res = await withGeminiRetry<GeminiResult>(
     requestId,
