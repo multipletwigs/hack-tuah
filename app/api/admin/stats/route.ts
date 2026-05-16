@@ -17,7 +17,7 @@ export async function GET() {
 
   const startupMap = new Map(allStartups.map(s => [s.startup_id, s]))
   const linkagesByStartup = new Map<string, typeof allLinkages>()
-  for (const l of allLinkages) {
+  for (const l of allLinkages.filter(linkage => linkage.sourceType === 'startup')) {
     if (!linkagesByStartup.has(l.startupId)) linkagesByStartup.set(l.startupId, [])
     linkagesByStartup.get(l.startupId)!.push(l)
   }

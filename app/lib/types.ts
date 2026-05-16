@@ -1,4 +1,4 @@
-export type ActorType = 'mentor' | 'initiative' | 'partner'
+export type ActorType = 'startup' | 'mentor' | 'initiative' | 'partner'
 
 export interface Initiative {
   initiativeId: string
@@ -53,6 +53,10 @@ export interface MatchResponse {
 export interface LinkageCreate {
   startupId: string
   startupName: string
+  sourceId?: string
+  sourceName?: string
+  sourceType?: ActorType
+  sourcePartnerType?: PartnerType | null
   actorType: ActorType
   partnerType: PartnerType | null
   actorId: string
@@ -65,6 +69,10 @@ export interface Linkage {
   linkageId: string
   startupId: string
   startupName: string
+  sourceId: string
+  sourceName: string
+  sourceType: ActorType
+  sourcePartnerType: PartnerType | null
   actorType: ActorType
   partnerType: PartnerType | null
   actorId: string

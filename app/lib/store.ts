@@ -18,6 +18,10 @@ interface LinkageDoc {
   linkage_id: string
   startup_id: string
   startup_name: string
+  source_id?: string
+  source_name?: string
+  source_type?: string
+  source_partner_type?: string | null
   actor_type: string
   partner_type: string | null
   actor_id: string
@@ -176,6 +180,10 @@ export function docToLinkage(doc: LinkageDoc): Linkage {
     linkageId: doc.linkage_id,
     startupId: doc.startup_id,
     startupName: doc.startup_name,
+    sourceId: doc.source_id ?? doc.startup_id,
+    sourceName: doc.source_name ?? doc.startup_name,
+    sourceType: (doc.source_type ?? 'startup') as Linkage['sourceType'],
+    sourcePartnerType: (doc.source_partner_type ?? null) as Linkage['sourcePartnerType'],
     actorType: doc.actor_type as Linkage['actorType'],
     partnerType: doc.partner_type as Linkage['partnerType'],
     actorId: doc.actor_id,

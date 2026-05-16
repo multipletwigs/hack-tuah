@@ -73,11 +73,26 @@ function allMatchEntries(result: AgentMatchResult | null): MatchEntry[] {
   ])
 }
 
-function ResultCard({ entry, confirmed, onConfirm, meta }: {
+function kindActorType(kind: GraphNodeKind): MatchEntry['actorType'] {
+  if (kind === 'startup') return 'startup'
+  if (kind === 'initiative') return 'initiative'
+  if (kind === 'mentor') return 'mentor'
+  return 'partner'
+}
+
+function kindPartnerType(kind: GraphNodeKind): string | null {
+  if (kind === 'investor') return 'investor'
+  if (kind === 'service') return 'service_provider'
+  if (kind === 'partner') return 'corporate'
+  return null
+}
+
+function ResultCard({ entry, confirmed, onConfirm, meta, canConfirm }: {
   entry: MatchEntry
   confirmed: boolean
   onConfirm: (e: MatchEntry) => Promise<void>
   meta?: string
+  canConfirm: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -90,26 +105,29 @@ function ResultCard({ entry, confirmed, onConfirm, meta }: {
           {meta && <span className="result-card-meta">{meta}</span>}
         </span>
         <span className={`score-badge ${scoreClass(entry.matchScore)}`}>{entry.matchScore}%</span>
-        <button
-          className={`btn result-link-btn${confirmed ? ' btn-confirmed' : ' btn-primary'}`}
-          disabled={confirmed || busy}
-          onClick={async () => { setBusy(true); try { await onConfirm(entry) } finally { setBusy(false) } }}
-        >
-          {confirmed ? '✓' : busy ? '…' : 'Link'}
-        </button>
+        {canConfirm && (
+          <button
+            className={`btn result-link-btn${confirmed ? ' btn-confirmed' : ' btn-primary'}`}
+            disabled={confirmed || busy}
+            onClick={async () => { setBusy(true); try { await onConfirm(entry) } finally { setBusy(false) } }}
+          >
+            {confirmed ? '✓' : busy ? '…' : 'Link'}
+          </button>
+        )}
       </div>
       {expanded && <p className="result-card-reason">{entry.matchReason}</p>}
     </div>
   )
 }
 
-function ResultSection({ title, entries, topK, confirmed, onConfirm, getMeta }: {
+function ResultSection({ title, entries, topK, confirmed, onConfirm, getMeta, canConfirm }: {
   title: string
   entries: MatchEntry[]
   topK: number
   confirmed: Set<string>
   onConfirm: (e: MatchEntry) => Promise<void>
   getMeta?: (e: MatchEntry) => string | undefined
+  canConfirm?: (e: MatchEntry) => boolean
 }) {
   const [open, setOpen] = useState(true)
   const shown = entries.slice(0, topK)
@@ -121,7 +139,14 @@ function ResultSection({ title, entries, topK, confirmed, onConfirm, getMeta }: 
         <span className="count-badge">{shown.length}</span>
       </button>
       {open && shown.map(e => (
-        <ResultCard key={e.actorId} entry={e} confirmed={confirmed.has(e.actorId)} onConfirm={onConfirm} meta={getMeta?.(e)} />
+        <ResultCard
+          key={e.actorId}
+          entry={e}
+          confirmed={confirmed.has(e.actorId)}
+          onConfirm={onConfirm}
+          meta={getMeta?.(e)}
+          canConfirm={canConfirm?.(e) ?? true}
+        />
       ))}
     </div>
   )
@@ -131,6 +156,9 @@ const CX = 430
 const CY = 260
 const GROUP_RING_R = 138
 const ACTOR_RING_R = 220
+const TOP_K_MIN = 1
+const TOP_K_MAX = 5
+const DEFAULT_TOP_K = 3
 
 type GroupKind = 'startups' | 'mentors' | 'partners' | 'initiatives'
 
@@ -202,7 +230,7 @@ function EcosystemGraph({ startups, partners, initiatives, selectedId, result, s
   const matchedIds = useMemo(() => new Set(allMatchEntries(result).map(e => e.actorId)), [result])
 
   const groupHasMatch = useMemo((): Record<GroupKind, boolean> => ({
-    startups:    false,
+    startups:    (result?.startups.length ?? 0) > 0,
     mentors:     (result?.mentors.length ?? 0) > 0,
     partners:    ((result?.corporatePartners.length ?? 0) + (result?.investors.length ?? 0) + (result?.serviceProviders.length ?? 0)) > 0,
     initiatives: (result?.initiatives.length ?? 0) > 0,
@@ -316,7 +344,7 @@ export default function MatchesPage() {
   const [selectedNodeId, setSelectedNodeId] = useState('matcher')
   const [topK, setTopK] = useState(() => {
     const v = Number(process.env.NEXT_PUBLIC_DEFAULT_TOP_K)
-    return v >= 1 && v <= 5 ? v : 3
+    return Number.isFinite(v) ? Math.min(TOP_K_MAX, Math.max(TOP_K_MIN, v)) : DEFAULT_TOP_K
   })
   // const [query, setQuery] = useState('')
   // const [messages, setMessages] = useState<{ role: string; text: string }[]>([])
@@ -373,26 +401,33 @@ export default function MatchesPage() {
   */
 
   async function confirmLinkage(entry: MatchEntry) {
-    let body: Record<string, unknown>
+    const sourceType = kindActorType(selectedKind)
+    const sourcePartnerType = kindPartnerType(selectedKind)
+    const body: Record<string, unknown> = {
+      sourceId: selectedId,
+      sourceName: selectedActorName,
+      sourceType,
+      sourcePartnerType,
+      actorType: entry.actorType,
+      partnerType: entry.partnerType,
+      actorId: entry.actorId,
+      actorName: entry.actorName,
+      matchScore: entry.matchScore,
+      matchReason: entry.matchReason,
+    }
+
     if (fromStartup) {
       const startup = startups.find(s => s.startup_id === selectedId)
-      body = {
+      Object.assign(body, {
         startupId: selectedId, startupName: startup?.startup_name ?? '',
-        actorType: entry.actorType,
-        partnerType: entry.partnerType,
-        actorId: entry.actorId, actorName: entry.actorName,
-        matchScore: entry.matchScore, matchReason: entry.matchReason,
-      }
-    } else {
+      })
+    } else if (entry.actorType === 'startup') {
       const startup = startups.find(s => s.startup_id === entry.actorId)
-      body = {
+      Object.assign(body, {
         startupId: entry.actorId, startupName: startup?.startup_name ?? entry.actorName,
-        actorType: selectedKind === 'initiative' ? 'initiative' : 'partner',
-        partnerType: selectedKind === 'investor' ? 'investor' : selectedKind === 'service' ? 'service_provider' : selectedKind === 'mentor' ? null : 'corporate',
-        actorId: selectedId, actorName: selectedActorName,
-        matchScore: entry.matchScore, matchReason: entry.matchReason,
-      }
+      })
     }
+
     const res = await fetch('/api/linkages', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     })
@@ -411,9 +446,16 @@ export default function MatchesPage() {
         { label: 'Service Providers', entries: result?.serviceProviders  ?? [] },
         { label: 'Initiatives',       entries: result?.initiatives       ?? [], getMeta: (entry: MatchEntry) => initiatives.find(i => i.initiativeId === entry.actorId)?.type },
       ].filter(s => s.entries.length > 0)
-    : result?.startups.length
-      ? [{ label: 'Matching Startups', entries: result.startups }]
-      : []
+    : [
+        { label: 'Startups',           entries: result?.startups          ?? [] },
+        { label: 'Mentors',            entries: result?.mentors           ?? [] },
+        { label: 'Corporate Partners', entries: result?.corporatePartners ?? [] },
+        { label: 'Investors',          entries: result?.investors         ?? [] },
+        { label: 'Service Providers',  entries: result?.serviceProviders  ?? [] },
+        { label: 'Initiatives',        entries: result?.initiatives       ?? [], getMeta: (entry: MatchEntry) => initiatives.find(i => i.initiativeId === entry.actorId)?.type },
+      ].filter(s => s.entries.length > 0)
+
+  const canConfirmMatch = () => true
 
   return (
     <div className="admin-content matching-network-page">
@@ -478,15 +520,15 @@ export default function MatchesPage() {
           <section className="section-card result-panel">
             <div className="result-panel-header">
               <span className="section-card-title">
-                {result ? (fromStartup ? 'Ecosystem Matches' : 'Matching Startups') : 'Match Results'}
+                {result ? (fromStartup ? 'Ecosystem Matches' : 'Actor Matches') : 'Match Results'}
               </span>
               {result && (
                 <div className="topk-bar">
                   <span>Top K</span>
                   <div className="topk-controls">
-                    <button className="topk-btn" onClick={() => setTopK(k => Math.max(1, k - 1))}>−</button>
+                    <button className="topk-btn" disabled={topK <= TOP_K_MIN} onClick={() => setTopK(k => Math.max(TOP_K_MIN, k - 1))}>−</button>
                     <span className="topk-val">{topK}</span>
-                    <button className="topk-btn" onClick={() => setTopK(k => Math.min(5, k + 1))}>+</button>
+                    <button className="topk-btn" disabled={topK >= TOP_K_MAX} onClick={() => setTopK(k => Math.min(TOP_K_MAX, k + 1))}>+</button>
                   </div>
                 </div>
               )}
@@ -517,6 +559,7 @@ export default function MatchesPage() {
                 topK={topK}
                 confirmed={confirmed}
                 onConfirm={confirmLinkage}
+                canConfirm={canConfirmMatch}
                 getMeta={'getMeta' in section ? section.getMeta : undefined}
               />
             ))}
