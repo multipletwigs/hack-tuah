@@ -52,27 +52,6 @@ function scoreClass(score: number): string {
   return 'score-low'
 }
 
-function uniqueEntries(entries: MatchEntry[]): MatchEntry[] {
-  const seen = new Set<string>()
-  return entries.filter(entry => {
-    if (seen.has(entry.actorId)) return false
-    seen.add(entry.actorId)
-    return true
-  })
-}
-
-function allMatchEntries(result: AgentMatchResult | null): MatchEntry[] {
-  if (!result) return []
-  return uniqueEntries([
-    ...result.mentors,
-    ...result.corporatePartners,
-    ...result.investors,
-    ...result.serviceProviders,
-    ...result.initiatives,
-    ...result.startups,
-  ])
-}
-
 function kindActorType(kind: GraphNodeKind): MatchEntry['actorType'] {
   if (kind === 'startup') return 'startup'
   if (kind === 'initiative') return 'initiative'
@@ -215,26 +194,18 @@ function getGroupActors(
   }
 }
 
-function EcosystemGraph({ startups, partners, initiatives, selectedId, result, selectedNodeId, onSelectNode, onRunMatch }: {
+function EcosystemGraph({ startups, partners, initiatives, selectedId, selectedNodeId, filterText, onSelectNode, onRunMatch }: {
   startups: StartupRow[]
   partners: PartnerRow[]
   initiatives: InitiativeRow[]
   selectedId: string
-  result: AgentMatchResult | null
   selectedNodeId: string
+  filterText: string
   onSelectNode: (id: string) => void
   onRunMatch: (id: string, kind: GraphNodeKind) => void
 }) {
   const [expandedGroup, setExpandedGroup] = useState<GroupKind | null>(null)
-
-  const matchedIds = useMemo(() => new Set(allMatchEntries(result).map(e => e.actorId)), [result])
-
-  const groupHasMatch = useMemo((): Record<GroupKind, boolean> => ({
-    startups:    (result?.startups.length ?? 0) > 0,
-    mentors:     (result?.mentors.length ?? 0) > 0,
-    partners:    ((result?.corporatePartners.length ?? 0) + (result?.investors.length ?? 0) + (result?.serviceProviders.length ?? 0)) > 0,
-    initiatives: (result?.initiatives.length ?? 0) > 0,
-  }), [result])
+  const normalizedFilter = filterText.trim().toLowerCase()
 
   const groupCounts = useMemo((): Record<GroupKind, number> => ({
     startups:    startups.length,
@@ -257,8 +228,17 @@ function EcosystemGraph({ startups, partners, initiatives, selectedId, result, s
     if (!expandedGroup) return []
     const meta = GROUP_META.find(g => g.group === expandedGroup)!
     const actors = getGroupActors(expandedGroup, startups, partners, initiatives)
+      .filter(actor => {
+        if (!normalizedFilter) return true
+        return [
+          actor.id,
+          actor.label,
+          actor.sublabel,
+          actor.kind,
+        ].some(value => value.toLowerCase().includes(normalizedFilter))
+      })
     return placeArc(actors, meta.angle, ACTOR_RING_R, 30)
-  }, [expandedGroup, startups, partners, initiatives])
+  }, [expandedGroup, startups, partners, initiatives, normalizedFilter])
 
   const expandedGroupNode = groupNodes.find(n => GROUP_META.find(m => m.id === n.id)?.group === expandedGroup)
   const activeActorNode   = actorNodes.find(n => n.id === selectedId)
@@ -276,9 +256,9 @@ function EcosystemGraph({ startups, partners, initiatives, selectedId, result, s
         {/* Group → actor edges (when expanded) */}
         {expandedGroupNode && actorNodes.map(an => (
           <line key={`ae-${an.id}`}
-            className={`edge${matchedIds.has(an.id) ? ' match' : ''}`}
+            className={`edge${an.id === selectedId ? ' active' : ''}`}
             x1={expandedGroupNode.x} y1={expandedGroupNode.y} x2={an.x} y2={an.y}
-            opacity={matchedIds.has(an.id) ? 0.9 : 0.4}
+            opacity={an.id === selectedId ? 0.9 : 0.4}
           />
         ))}
 
@@ -300,7 +280,6 @@ function EcosystemGraph({ startups, partners, initiatives, selectedId, result, s
         {groupNodes.map(node => {
           const meta    = GROUP_META.find(m => m.id === node.id)!
           const isOpen  = meta.group === expandedGroup
-          const hasBadge = groupHasMatch[meta.group]
           return (
             <g key={node.id}
               className={`node ${node.kind} group-node${isOpen ? ' selected' : ''}`}
@@ -309,7 +288,6 @@ function EcosystemGraph({ startups, partners, initiatives, selectedId, result, s
               style={{ cursor: 'pointer' }}
             >
               <circle r={node.r} />
-              {hasBadge && <circle r={7} cx={node.r - 5} cy={-(node.r - 5)} className="match-dot" />}
               <text y="-5">{node.label}</text>
               <text className="sub" y="12">{node.sublabel}</text>
             </g>
@@ -319,7 +297,7 @@ function EcosystemGraph({ startups, partners, initiatives, selectedId, result, s
         {/* Individual actor nodes */}
         {actorNodes.map(node => (
           <g key={node.id}
-            className={['node', node.kind, selectedNodeId === node.id ? 'selected' : '', matchedIds.has(node.id) ? 'matched' : ''].filter(Boolean).join(' ')}
+            className={['node', node.kind, selectedNodeId === node.id ? 'selected' : ''].filter(Boolean).join(' ')}
             transform={`translate(${node.x} ${node.y})`}
             onClick={() => { onSelectNode(node.id); onRunMatch(node.id, node.kind) }}
             style={{ cursor: 'pointer' }}
@@ -342,6 +320,7 @@ export default function MatchesPage() {
   const [selectedId,   setSelectedId]   = useState('')
   const [selectedKind, setSelectedKind] = useState<GraphNodeKind>('matcher')
   const [selectedNodeId, setSelectedNodeId] = useState('matcher')
+  const [graphFilter, setGraphFilter] = useState('')
   const [topK, setTopK] = useState(() => {
     const v = Number(process.env.NEXT_PUBLIC_DEFAULT_TOP_K)
     return Number.isFinite(v) ? Math.min(TOP_K_MAX, Math.max(TOP_K_MIN, v)) : DEFAULT_TOP_K
@@ -467,10 +446,23 @@ export default function MatchesPage() {
               {loading ? '⏳ Matching…' : selectedActorName ? `Selected: ${selectedActorName}` : 'Expand a group → click an actor to match'}
             </span>
           </div>
+          <div className="network-filter-bar">
+            <input
+              value={graphFilter}
+              onChange={event => setGraphFilter(event.target.value)}
+              placeholder="Filter visible nodes by name, type, industry, or ID"
+              aria-label="Filter visible network nodes"
+            />
+            {graphFilter && (
+              <button type="button" className="network-filter-clear" onClick={() => setGraphFilter('')}>
+                Clear
+              </button>
+            )}
+          </div>
           <EcosystemGraph
             startups={startups} partners={partners} initiatives={initiatives}
-            selectedId={selectedId} result={result}
-            selectedNodeId={selectedNodeId} onSelectNode={setSelectedNodeId}
+            selectedId={selectedId}
+            selectedNodeId={selectedNodeId} filterText={graphFilter} onSelectNode={setSelectedNodeId}
             onRunMatch={(id: string, kind: GraphNodeKind) => { generate(id, kind) }}
           />
           <div className="network-legend">
