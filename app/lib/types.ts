@@ -1,4 +1,4 @@
-export type ActorType = 'mentor' | 'initiative' | 'partner' | 'programme'
+export type ActorType = 'mentor' | 'initiative' | 'partner'
 
 export interface Initiative {
   initiativeId: string
@@ -72,7 +72,7 @@ export interface Linkage {
   matchScore: number
   matchReason: string
   status: 'active' | 'pending' | 'closed'
-  programmeCycle: string | null
+  initiativeCycle: string | null
   createdAt: string
   outcome: string | null
 }

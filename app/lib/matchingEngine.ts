@@ -41,7 +41,7 @@ function loadSeedData(): CandidateSet {
   const dir = join(process.cwd(), 'data')
   return {
     mentors: JSON.parse(readFileSync(join(dir, 'mentors.json'), 'utf8')),
-    initiatives: JSON.parse(readFileSync(join(dir, 'programmes.json'), 'utf8')),
+    initiatives: JSON.parse(readFileSync(join(dir, 'initiatives.json'), 'utf8')),
     partners: JSON.parse(readFileSync(join(dir, 'partners.json'), 'utf8')),
   }
 }

@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     match_score: matchScore,
     match_reason: matchReason,
     status: 'active',
-    programme_cycle: null,
+    initiative_cycle: null,
     created_at: new Date().toISOString(),
     outcome: null,
   })

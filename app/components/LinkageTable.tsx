@@ -13,12 +13,12 @@ function scoreClass(score: number) {
 
 function actorTagClass(t: ActorType) {
   if (t === 'mentor') return 'tag-mentor'
-  if (t === 'initiative' || t === 'programme') return 'tag-programme'
+  if (t === 'initiative' || String(t) === 'programme') return 'tag-programme'
   return 'tag-corporate'
 }
 
 function actorLabel(t: ActorType) {
-  if (t === 'programme') return 'Initiative'
+  if (String(t) === 'programme') return 'Initiative'
   return t.charAt(0).toUpperCase() + t.slice(1)
 }
 
