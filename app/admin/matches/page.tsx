@@ -131,10 +131,11 @@ function ResultSection({ title, entries, topK, confirmed, onConfirm, getMeta, ca
   )
 }
 
-const CX = 430
-const CY = 260
+const GRAPH_W = 860
+const GRAPH_H = 520
+const CX = GRAPH_W / 2
+const CY = GRAPH_H / 2
 const GROUP_RING_R = 138
-const ACTOR_RING_R = 220
 const TOP_K_MIN = 1
 const TOP_K_MAX = 5
 const DEFAULT_TOP_K = 3
@@ -150,27 +151,151 @@ const GROUP_META: Array<{ id: string; kind: GraphNodeKind; group: GroupKind; ang
 
 function trunc(s: string, n = 12) { return s.length > n ? `${s.slice(0, n - 1)}…` : s }
 
-function placeArc(
+function actorNodeSize(count: number): number {
+  if (count <= 8) return 30
+  if (count <= 16) return 25
+  if (count <= 28) return 21
+  return 18
+}
+
+function actorLabelLimit(count: number): number {
+  if (count <= 8) return 13
+  if (count <= 16) return 11
+  if (count <= 28) return 9
+  return 7
+}
+
+function placeRings(
   items: Array<{ id: string; label: string; sublabel: string; kind: GraphNodeKind }>,
-  centerAngle: number,
-  ringR: number,
-  nodeR: number,
+  centerX: number,
+  centerY: number,
 ): GraphNode[] {
-  const n = items.length
-  const spread = Math.min(Math.PI * 0.85, 0.5 + n * 0.22)
-  return items.map((item, i) => {
-    const angle = n === 1 ? centerAngle : centerAngle - spread / 2 + (spread * i) / (n - 1)
-    return {
-      id: item.id,
-      name: item.label,
-      label: trunc(item.label),
-      sublabel: item.sublabel,
-      kind: item.kind,
-      x: Math.round(CX + ringR * Math.cos(angle)),
-      y: Math.round(CY + ringR * Math.sin(angle)),
-      r: nodeR,
-    }
+  const count = items.length
+  if (count === 0) return []
+
+  const nodeR = actorNodeSize(count)
+  const labelLimit = actorLabelLimit(count)
+  const maxRingR = Math.min(centerX, centerY) - nodeR - 18
+  const minRingR = 92
+  const ringCount = count <= 10 ? 1 : count <= 24 ? 2 : 3
+  const availableR = Math.max(0, maxRingR - minRingR)
+  const ringGap = ringCount === 1 ? 0 : availableR / (ringCount - 1)
+  const rings: Array<{ start: number; end: number; radius: number; offset: number }> = []
+  let start = 0
+
+  for (let ringIndex = 0; ringIndex < ringCount && start < count; ringIndex += 1) {
+    const radius = ringCount === 1 ? maxRingR : minRingR + ringGap * ringIndex
+    const remaining = count - start
+    const ringsLeft = ringCount - ringIndex
+    const take = Math.ceil(remaining / ringsLeft)
+    rings.push({
+      start,
+      end: start + take,
+      radius,
+      offset: ringIndex % 2 === 0 ? -Math.PI / 2 : -Math.PI / 2 + Math.PI / Math.max(take, 2),
+    })
+    start += take
+  }
+
+  return rings.flatMap(ring => {
+    const ringItems = items.slice(ring.start, ring.end)
+    const ringCount = ringItems.length
+    return ringItems.map((item, i) => {
+      const angle = ringCount === 1 ? ring.offset : ring.offset + (Math.PI * 2 * i) / ringCount
+      return {
+        id: item.id,
+        name: item.label,
+        label: trunc(item.label, labelLimit),
+        sublabel: item.sublabel,
+        kind: item.kind,
+        x: Math.round(centerX + ring.radius * Math.cos(angle)),
+        y: Math.round(centerY + ring.radius * Math.sin(angle)),
+        r: nodeR,
+      }
+    })
   })
+}
+
+function overviewGroupNodes(groupCounts: Record<GroupKind, number>): GraphNode[] {
+  return GROUP_META.map(g => ({
+    id: g.id,
+    name: g.label,
+    label: g.label,
+    sublabel: `${groupCounts[g.group]} actors`,
+    kind: g.kind,
+    x: Math.round(CX + GROUP_RING_R * Math.cos(g.angle)),
+    y: Math.round(CY + GROUP_RING_R * Math.sin(g.angle)),
+    r: 44,
+  }))
+}
+
+function focusedGroupNode(group: GroupKind, groupCounts: Record<GroupKind, number>): GraphNode {
+  const meta = GROUP_META.find(g => g.group === group)!
+  return {
+    id: meta.id,
+    name: meta.label,
+    label: meta.label,
+    sublabel: `${groupCounts[group]} actors`,
+    kind: meta.kind,
+    x: CX,
+    y: CY,
+    r: 54,
+  }
+}
+
+function graphNodeTitle(node: GraphNode): string {
+  return node.sublabel ? `${node.name} - ${node.sublabel}` : node.name
+}
+
+function ActorNode({ node, selected, onClick }: {
+  node: GraphNode
+  selected: boolean
+  onClick: () => void
+}) {
+  const isCompact = node.r <= 22
+  return (
+    <g
+      className={['node', node.kind, selected ? 'selected' : '', isCompact ? 'compact' : ''].filter(Boolean).join(' ')}
+      transform={`translate(${node.x} ${node.y})`}
+      onClick={onClick}
+      style={{ cursor: 'pointer' }}
+    >
+      <title>{graphNodeTitle(node)}</title>
+      <circle r={node.r} />
+      <text y={isCompact ? '3' : '-4'}>{node.label}</text>
+      {!isCompact && <text className="sub" y="12">{node.sublabel}</text>}
+    </g>
+  )
+}
+
+function GroupNode({ node, selected, onClick }: {
+  node: GraphNode
+  selected: boolean
+  onClick: () => void
+}) {
+  return (
+    <g
+      className={`node ${node.kind} group-node${selected ? ' selected' : ''}`}
+      transform={`translate(${node.x} ${node.y})`}
+      onClick={onClick}
+      style={{ cursor: 'pointer' }}
+    >
+      <title>{graphNodeTitle(node)}</title>
+      <circle r={node.r} />
+      <text y="-5">{node.label}</text>
+      <text className="sub" y="12">{node.sublabel}</text>
+    </g>
+  )
+}
+
+function MatcherNode() {
+  return (
+    <g className="node matcher" transform={`translate(${CX} ${CY})`}>
+      <circle r={56} />
+      <text y="-4">Matcher</text>
+      <text className="sub" y="14">agent core</text>
+    </g>
+  )
 }
 
 function step(tool: string, detail: string): LoadingOverlayStep {
@@ -218,19 +343,13 @@ function EcosystemGraph({ startups, partners, initiatives, selectedId, selectedN
     initiatives: initiatives.length,
   }), [startups, partners, initiatives])
 
-  const groupNodes = useMemo<GraphNode[]>(() =>
-    GROUP_META.map(g => ({
-      id: g.id, name: g.label, label: g.label, sublabel: `${groupCounts[g.group]} actors`,
-      kind: g.kind,
-      x: Math.round(CX + GROUP_RING_R * Math.cos(g.angle)),
-      y: Math.round(CY + GROUP_RING_R * Math.sin(g.angle)),
-      r: 44,
-    })),
-  [groupCounts])
+  const groupNodes = useMemo<GraphNode[]>(() => {
+    if (expandedGroup) return [focusedGroupNode(expandedGroup, groupCounts)]
+    return overviewGroupNodes(groupCounts)
+  }, [expandedGroup, groupCounts])
 
   const actorNodes = useMemo<GraphNode[]>(() => {
     if (!expandedGroup) return []
-    const meta = GROUP_META.find(g => g.group === expandedGroup)!
     const actors = getGroupActors(expandedGroup, startups, partners, initiatives)
       .filter(actor => {
         if (!normalizedFilter) return true
@@ -241,17 +360,17 @@ function EcosystemGraph({ startups, partners, initiatives, selectedId, selectedN
           actor.kind,
         ].some(value => value.toLowerCase().includes(normalizedFilter))
       })
-    return placeArc(actors, meta.angle, ACTOR_RING_R, 30)
+    return placeRings(actors, CX, CY)
   }, [expandedGroup, startups, partners, initiatives, normalizedFilter])
 
-  const expandedGroupNode = groupNodes.find(n => GROUP_META.find(m => m.id === n.id)?.group === expandedGroup)
+  const expandedGroupNode = expandedGroup ? groupNodes[0] : undefined
   const activeActorNode   = actorNodes.find(n => n.id === selectedId)
 
   return (
     <div className="network-wrap">
-      <svg className="network-svg" viewBox="0 0 860 520" role="img" aria-label="Matching engine network graph">
+      <svg className="network-svg" viewBox={`0 0 ${GRAPH_W} ${GRAPH_H}`} role="img" aria-label="Matching engine network graph">
         {/* Matcher → group edges */}
-        {groupNodes.map(gn => {
+        {!expandedGroup && groupNodes.map(gn => {
           const isOpen = GROUP_META.find(m => m.id === gn.id)?.group === expandedGroup
           return <line key={`ge-${gn.id}`} className={`edge${isOpen ? ' active' : ''}`}
             x1={CX} y1={CY} x2={gn.x} y2={gn.y} opacity={isOpen ? 0.85 : 0.35} />
@@ -266,50 +385,38 @@ function EcosystemGraph({ startups, partners, initiatives, selectedId, selectedN
           />
         ))}
 
-        {/* Selected startup → matcher flow edge */}
-        {activeActorNode && (
+        {/* Selected actor → focused group flow edge */}
+        {expandedGroupNode && activeActorNode && (
           <line className="edge active" strokeDasharray="6 5"
-            x1={activeActorNode.x} y1={activeActorNode.y} x2={CX} y2={CY}
+            x1={activeActorNode.x} y1={activeActorNode.y} x2={expandedGroupNode.x} y2={expandedGroupNode.y}
           />
         )}
 
         {/* Matcher */}
-        <g className="node matcher" transform={`translate(${CX} ${CY})`}>
-          <circle r={56} />
-          <text y="-4">Matcher</text>
-          <text className="sub" y="14">agent core</text>
-        </g>
+        {!expandedGroup && <MatcherNode />}
 
         {/* Group nodes */}
         {groupNodes.map(node => {
           const meta    = GROUP_META.find(m => m.id === node.id)!
           const isOpen  = meta.group === expandedGroup
           return (
-            <g key={node.id}
-              className={`node ${node.kind} group-node${isOpen ? ' selected' : ''}`}
-              transform={`translate(${node.x} ${node.y})`}
+            <GroupNode
+              key={node.id}
+              node={node}
+              selected={isOpen}
               onClick={() => { setExpandedGroup(isOpen ? null : meta.group); onSelectNode(node.id) }}
-              style={{ cursor: 'pointer' }}
-            >
-              <circle r={node.r} />
-              <text y="-5">{node.label}</text>
-              <text className="sub" y="12">{node.sublabel}</text>
-            </g>
+            />
           )
         })}
 
         {/* Individual actor nodes */}
         {actorNodes.map(node => (
-          <g key={node.id}
-            className={['node', node.kind, selectedNodeId === node.id ? 'selected' : ''].filter(Boolean).join(' ')}
-            transform={`translate(${node.x} ${node.y})`}
+          <ActorNode
+            key={node.id}
+            node={node}
+            selected={selectedNodeId === node.id}
             onClick={() => { onSelectNode(node.id); onRunMatch(node.id, node.kind) }}
-            style={{ cursor: 'pointer' }}
-          >
-            <circle r={node.r} />
-            <text y="-4">{node.label}</text>
-            <text className="sub" y="12">{node.sublabel}</text>
-          </g>
+          />
         ))}
       </svg>
     </div>
