@@ -96,17 +96,17 @@ export default function PartnersPage() {
           </thead>
           <tbody>
             {loading
-              ? <tr><td colSpan={6}><div className="empty-state">Loading…</div></td></tr>
+              ? <tr key="loading"><td colSpan={6}><div className="empty-state">Loading…</div></td></tr>
               : filtered.length === 0
-              ? <tr><td colSpan={6}><div className="empty-state">No partners in this category.</div></td></tr>
-              : filtered.map(p => (
-                <tr key={p.partnerId}>
+              ? <tr key="empty"><td colSpan={6}><div className="empty-state">No partners in this category.</div></td></tr>
+              : filtered.map((p, i) => (
+                <tr key={p.partnerId ?? i}>
                   <td><strong>{p.orgName}</strong></td>
                   <td><span className={`actor-tag ${typeTagClass(p.partnerType)}`}>{typeLabel(p.partnerType)}</span></td>
                   <td>{p.industry}</td>
                   <td style={{ fontSize: '0.8rem', color: '#64748b' }}>{p.contactEmail}</td>
                   <td><StatusBadge status={p.status === 'active' ? 'active' : 'pending'} /></td>
-                  <td>{p.createdAt.slice(0, 10)}</td>
+                  <td>{p.createdAt?.slice(0, 10) ?? '—'}</td>
                 </tr>
               ))
             }

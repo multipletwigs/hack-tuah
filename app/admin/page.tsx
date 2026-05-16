@@ -109,7 +109,7 @@ export default function AdminDashboard() {
                   <strong>{l.startupName}</strong> → {l.actorName}
                   <div className="activity-meta"><StatusBadge status={l.status} /> · {l.actorType}</div>
                 </div>
-                <span className="activity-date">{l.createdAt.slice(0, 10)}</span>
+                <span className="activity-date">{l.createdAt?.slice(0, 10) ?? '—'}</span>
               </div>
             ))
           }

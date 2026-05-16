@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { getModel, responseText, responseFunctionCalls } from './vertex'
+import { getModel, responseText } from './vertex'
 import { store, docToPartnerRecord, docToInitiative, docToLinkage } from './store'
 
 export interface AgentStep {
@@ -36,17 +36,6 @@ type GeminiResult = {
 
 function preview(value: string, limit = 700): string {
   return value.length > limit ? `${value.slice(0, limit)}...` : value
-}
-
-function summarizeToolResult(result: unknown): Record<string, unknown> {
-  if (!result || typeof result !== 'object') return { type: typeof result }
-  const record = result as Record<string, unknown>
-  return Object.fromEntries(
-    Object.entries(record).map(([key, value]) => [
-      key,
-      Array.isArray(value) ? { count: value.length } : typeof value,
-    ]),
-  )
 }
 
 function logAgent(requestId: string, event: string, data: Record<string, unknown> = {}) {
@@ -103,8 +92,9 @@ async function withGeminiRetry<T>(
   return call()
 }
 
-function relevantLinkageRecords(actorId: string): Array<Record<string, unknown>> {
-  return store.getAllLinkages()
+async function relevantLinkageRecords(actorId: string): Promise<Array<Record<string, unknown>>> {
+  const linkages = await store.getAllLinkages()
+  return linkages
     .map(docToLinkage)
     .filter(linkage =>
       linkage.sourceId === actorId ||
@@ -129,87 +119,16 @@ function relevantLinkageRecords(actorId: string): Array<Record<string, unknown>>
     }))
 }
 
-const MATCH_ITEM = {
-  type: 'object' as const,
-  properties: {
-    actor_id:     { type: 'string' as const, description: 'ID of the actor from the fetched data' },
-    actor_name:   { type: 'string' as const, description: 'Name of the actor' },
-    match_score:  { type: 'number' as const, description: 'Match quality 0–100' },
-    match_reason: { type: 'string' as const, description: 'Two sentences explaining concrete value exchange: what the actor can actually provide to the startup AND what the startup provides back strategically' },
-  },
-  required: ['actor_id', 'actor_name', 'match_score', 'match_reason'],
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const TOOL_DECLARATIONS: any[] = [
-  {
-    name: 'get_startup_profile',
-    description: 'Fetch a startup\'s full profile (industry, stage, problem, needs) and existing linkages by ID',
-    parameters: {
-      type: 'object',
-      properties: { startup_id: { type: 'string', description: 'The startup ID' } },
-      required: ['startup_id'],
-    },
-  },
-  {
-    name: 'search_partners',
-    description: 'Search corporate partners, investors, or service providers. Use industry filter to narrow context before matching.',
-    parameters: {
-      type: 'object',
-      properties: {
-        industry:     { type: 'string', description: 'Industry keyword to filter by (e.g. fintech, healthtech)' },
-        partner_type: { type: 'string', description: 'corporate | investor | service_provider — omit to get all' },
-      },
-    },
-  },
-  {
-    name: 'search_mentors',
-    description: 'Search mentors, optionally filtered by industry expertise',
-    parameters: {
-      type: 'object',
-      properties: {
-        industry: { type: 'string', description: 'Industry keyword to filter by' },
-      },
-    },
-  },
-  {
-    name: 'search_initiatives',
-    description: 'Search initiatives such as programmes, grants, accelerators, incubators, and challenges. Filter by industry to reduce context size.',
-    parameters: {
-      type: 'object',
-      properties: {
-        industry: { type: 'string', description: 'Industry keyword to filter by' },
-        type:     { type: 'string', description: 'accelerator | grant | incubator | programme | challenge' },
-      },
-    },
-  },
-  {
-    name: 'submit_matches',
-    description: 'Submit final top-3 matches per category with value-based scores. Call this once you have enough data.',
-    parameters: {
-      type: 'object',
-      properties: {
-        mentors:            { type: 'array', items: MATCH_ITEM, description: 'Top 3 mentor matches' },
-        corporate_partners: { type: 'array', items: MATCH_ITEM, description: 'Top 3 corporate partner matches' },
-        investors:          { type: 'array', items: MATCH_ITEM, description: 'Top 3 investor matches' },
-        service_providers:  { type: 'array', items: MATCH_ITEM, description: 'Top 3 service provider matches' },
-        initiatives:        { type: 'array', items: MATCH_ITEM, description: 'Top 3 initiative matches' },
-      },
-      required: ['mentors', 'corporate_partners', 'investors', 'service_providers', 'initiatives'],
-    },
-  },
-]
-
-function executeTool(name: string, args: Record<string, string>): unknown {
+async function executeTool(name: string, args: Record<string, string>): Promise<unknown> {
   if (name === 'get_startup_profile') {
-    const doc = store.getStartup(args.startup_id)
+    const doc = await store.getStartup(args.startup_id)
     return doc
-      ? { startup: doc, existing_linkages: relevantLinkageRecords(args.startup_id) }
+      ? { startup: doc, existing_linkages: await relevantLinkageRecords(args.startup_id) }
       : { error: `Startup '${args.startup_id}' not found` }
   }
 
   if (name === 'search_partners') {
-    const all = store.getAllPartners().filter(p => p.partner_type !== 'mentor')
+    const all = (await store.getAllPartners()).filter(p => p.partner_type !== 'mentor')
     const filtered = all.filter(p => {
       if (args.partner_type && p.partner_type !== args.partner_type) return false
       if (args.industry && !p.industry.toLowerCase().includes(args.industry.toLowerCase())) return false
@@ -219,7 +138,7 @@ function executeTool(name: string, args: Record<string, string>): unknown {
   }
 
   if (name === 'search_mentors') {
-    const all = store.getAllPartners().filter(p => p.partner_type === 'mentor')
+    const all = (await store.getAllPartners()).filter(p => p.partner_type === 'mentor')
     const filtered = all.filter(p =>
       !args.industry || p.industry.toLowerCase().includes(args.industry.toLowerCase())
     )
@@ -227,7 +146,7 @@ function executeTool(name: string, args: Record<string, string>): unknown {
   }
 
   if (name === 'search_initiatives') {
-    const all = store.getAllInitiatives()
+    const all = await store.getAllInitiatives()
     const filtered = all.filter(i => {
       if (args.type && i.type !== args.type) return false
       if (args.industry && !i.focus_industries.some(f => f.toLowerCase().includes(args.industry.toLowerCase()))) return false
@@ -254,8 +173,9 @@ function toEntry(
   }
 }
 
-function startupCandidateRecords(excludeId?: string): Array<Record<string, unknown>> {
-  return store.getAllStartups()
+async function startupCandidateRecords(excludeId?: string): Promise<Array<Record<string, unknown>>> {
+  const startups = await store.getAllStartups()
+  return startups
     .filter(startup => startup.startup_id !== excludeId)
     .map(startup => ({
       actor_id: startup.startup_id,
@@ -269,8 +189,9 @@ function startupCandidateRecords(excludeId?: string): Array<Record<string, unkno
     }))
 }
 
-function partnerCandidateRecords(partnerType: string, excludeId?: string): Array<Record<string, unknown>> {
-  return store.getAllPartners()
+async function partnerCandidateRecords(partnerType: string, excludeId?: string): Promise<Array<Record<string, unknown>>> {
+  const partners = await store.getAllPartners()
+  return partners
     .filter(partner => partner.partner_type === partnerType && partner.partner_id !== excludeId)
     .map(partner => ({
       actor_id: partner.partner_id,
@@ -282,8 +203,9 @@ function partnerCandidateRecords(partnerType: string, excludeId?: string): Array
     }))
 }
 
-function initiativeCandidateRecords(excludeId?: string): Array<Record<string, unknown>> {
-  return store.getAllInitiatives()
+async function initiativeCandidateRecords(excludeId?: string): Promise<Array<Record<string, unknown>>> {
+  const initiatives = await store.getAllInitiatives()
+  return initiatives
     .filter(initiative => initiative.initiative_id !== excludeId)
     .map(initiative => ({
       actor_id: initiative.initiative_id,
@@ -322,15 +244,24 @@ For each match_reason (exactly 2 sentences):
 Score range: 60–100. Be selective — only include actors with genuine alignment.`
 
 export async function runMatchingAgent(startupId: string, requestId = crypto.randomUUID()): Promise<AgentMatchResult> {
-  const profileResult = executeTool('get_startup_profile', { startup_id: startupId }) as Record<string, unknown>
+  const profileResult = await executeTool('get_startup_profile', { startup_id: startupId }) as Record<string, unknown>
   const startup = profileResult.startup as Record<string, unknown> | undefined
   if (!startup || profileResult.error) throw new Error(`Startup '${startupId}' not found`)
 
-  const mentors = partnerCandidateRecords('mentor')
-  const corporatePartners = partnerCandidateRecords('corporate')
-  const investors = partnerCandidateRecords('investor')
-  const serviceProviders = partnerCandidateRecords('service_provider')
-  const initiatives = initiativeCandidateRecords()
+  const [
+    mentors,
+    corporatePartners,
+    investors,
+    serviceProviders,
+    initiatives,
+  ] = await Promise.all([
+    partnerCandidateRecords('mentor'),
+    partnerCandidateRecords('corporate'),
+    partnerCandidateRecords('investor'),
+    partnerCandidateRecords('service_provider'),
+    initiativeCandidateRecords(),
+  ])
+
   const steps: AgentStep[] = [
     { tool: 'get_startup_profile', args: { startup_id: startupId }, result: profileResult },
     { tool: 'load_mentor_candidates', args: {}, result: { mentors } },
@@ -419,7 +350,7 @@ export async function runActorMatching(actorId: string, actorType: 'partner' | '
   let actorProfile: Record<string, unknown>
   let sourceLabel: string
   if (actorType === 'partner') {
-    const doc = store.getPartner(actorId)
+    const doc = await store.getPartner(actorId)
     if (!doc) throw new Error(`Partner '${actorId}' not found`)
     const rec = docToPartnerRecord(doc)!
     sourceLabel = rec.orgName
@@ -455,7 +386,7 @@ export async function runActorMatching(actorId: string, actorType: 'partner' | '
       ...extra,
     }
   } else {
-    const doc = store.getInitiative(actorId)
+    const doc = await store.getInitiative(actorId)
     if (!doc) throw new Error(`Initiative '${actorId}' not found`)
     const init = docToInitiative(doc)!
     sourceLabel = init.name
@@ -489,15 +420,31 @@ export async function runActorMatching(actorId: string, actorType: 'partner' | '
     }
   }
 
+  const [
+    startupsCands,
+    mentorsCands,
+    corporateCands,
+    investorCands,
+    serviceProviderCands,
+    initiativesCands,
+    existingLinkages,
+  ] = await Promise.all([
+    startupCandidateRecords(actorType === 'partner' ? undefined : actorId),
+    partnerCandidateRecords('mentor', actorId),
+    partnerCandidateRecords('corporate', actorId),
+    partnerCandidateRecords('investor', actorId),
+    partnerCandidateRecords('service_provider', actorId),
+    initiativeCandidateRecords(actorType === 'initiative' ? actorId : undefined),
+    relevantLinkageRecords(actorId),
+  ])
   const candidates = {
-    startups: startupCandidateRecords(actorType === 'partner' ? undefined : actorId),
-    mentors: partnerCandidateRecords('mentor', actorId),
-    corporate_partners: partnerCandidateRecords('corporate', actorId),
-    investors: partnerCandidateRecords('investor', actorId),
-    service_providers: partnerCandidateRecords('service_provider', actorId),
-    initiatives: initiativeCandidateRecords(actorType === 'initiative' ? actorId : undefined),
+    startups: startupsCands,
+    mentors: mentorsCands,
+    corporate_partners: corporateCands,
+    investors: investorCands,
+    service_providers: serviceProviderCands,
+    initiatives: initiativesCands,
   }
-  const existingLinkages = relevantLinkageRecords(actorId)
 
   const prompt = `You are a Cradle ecosystem matching agent.
 

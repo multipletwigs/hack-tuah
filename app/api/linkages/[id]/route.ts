@@ -6,7 +6,7 @@ export async function GET(
   ctx: RouteContext<'/api/linkages/[id]'>,
 ) {
   const { id } = await ctx.params
-  const doc = store.getLinkage(id)
+  const doc = await store.getLinkage(id)
   if (!doc) return Response.json({ error: `Linkage '${id}' not found` }, { status: 404 })
   return Response.json(docToLinkage(doc))
 }
@@ -25,7 +25,7 @@ export async function PATCH(
     return Response.json({ error: 'No fields to update' }, { status: 422 })
   }
 
-  const updated = store.updateLinkage(id, updates as Parameters<typeof store.updateLinkage>[1])
+  const updated = await store.updateLinkage(id, updates as Parameters<typeof store.updateLinkage>[1])
   if (!updated) return Response.json({ error: `Linkage '${id}' not found` }, { status: 404 })
   return Response.json(docToLinkage(updated))
 }

@@ -1,9 +1,15 @@
-// In-memory store — process-level singleton, mirrors the Python StubStore.
-// Swap out for Firestore by replacing the methods below.
-
+import { db } from './firebase'
 import type { Linkage, Initiative, PartnerRecord } from './types'
 
-interface StartupDoc {
+function tsToISO(val: unknown): string {
+  if (!val) return ''
+  if (typeof val === 'string') return val
+  if (typeof val === 'object' && 'toDate' in (val as object))
+    return (val as { toDate(): Date }).toDate().toISOString()
+  return String(val)
+}
+
+export interface StartupDoc {
   startup_id: string
   cofounder_name: string
   startup_name: string
@@ -14,7 +20,7 @@ interface StartupDoc {
   created_at: string
 }
 
-interface LinkageDoc {
+export interface LinkageDoc {
   linkage_id: string
   startup_id: string
   startup_name: string
@@ -34,7 +40,7 @@ interface LinkageDoc {
   outcome: string | null
 }
 
-interface PartnerDoc {
+export interface PartnerDoc {
   partner_id: string
   org_name: string
   contact_name: string
@@ -45,7 +51,7 @@ interface PartnerDoc {
   created_at: string
 }
 
-interface InitiativeDoc {
+export interface InitiativeDoc {
   initiative_id: string
   name: string
   type: string
@@ -57,123 +63,86 @@ interface InitiativeDoc {
   created_at: string
 }
 
-function defaultStartups(): Record<string, StartupDoc> {
-  const now = new Date().toISOString()
-  const rows: StartupDoc[] = [
-    { startup_id: 'startup_001', cofounder_name: 'Ahmad Farhan', startup_name: 'PayEase',   industry: 'fintech',    stage: 'seed',     problem: 'Cross-border SME payments are slow and expensive.',      needs: ['mentorship', 'funding', 'pilot partners'], created_at: now },
-    { startup_id: 'startup_002', cofounder_name: 'Dr. Mei Ling', startup_name: 'MediTrack', industry: 'healthtech', stage: 'series-a', problem: 'Patient records are siloed across healthcare providers.', needs: ['funding', 'pilot partners'],               created_at: now },
-    { startup_id: 'startup_003', cofounder_name: 'Raj Kumar',    startup_name: 'EduSync',   industry: 'edtech',     stage: 'pre-seed', problem: 'Personalized learning is inaccessible to most students.', needs: ['mentorship', 'networking'],              created_at: now },
-    { startup_id: 'startup_004', cofounder_name: 'Nurul Ain',    startup_name: 'FarmTrace', industry: 'agritech',   stage: 'seed',     problem: 'Smallholder supply chains lack traceability.',           needs: ['mentorship', 'pilot partners'],           created_at: now },
-  ]
-  return Object.fromEntries(rows.map(r => [r.startup_id, r]))
+export const store = {
+  // --- Startups ---
+  async saveStartup(id: string, doc: StartupDoc) {
+    await db.collection('startups').doc(id).set(doc)
+  },
+
+  async getStartup(id: string): Promise<StartupDoc | null> {
+    const snap = await db.collection('startups').doc(id).get()
+    if (!snap.exists) return null
+    const d = snap.data() as StartupDoc
+    return { ...d, created_at: tsToISO(d.created_at) }
+  },
+
+  async getAllStartups(): Promise<StartupDoc[]> {
+    const snap = await db.collection('startups').get()
+    return snap.docs.map(d => { const s = d.data() as StartupDoc; return { ...s, created_at: tsToISO(s.created_at) } })
+  },
+
+  // --- Linkages ---
+  async saveLinkage(doc: LinkageDoc) {
+    await db.collection('linkages').doc(doc.linkage_id).set(doc)
+  },
+
+  async getLinkage(id: string): Promise<LinkageDoc | null> {
+    const snap = await db.collection('linkages').doc(id).get()
+    return snap.exists ? (snap.data() as LinkageDoc) : null
+  },
+
+  async getAllLinkages(): Promise<LinkageDoc[]> {
+    const snap = await db.collection('linkages').get()
+    return snap.docs.map(d => d.data() as LinkageDoc)
+  },
+
+  async updateLinkage(id: string, updates: Partial<LinkageDoc>): Promise<LinkageDoc | null> {
+    const ref = db.collection('linkages').doc(id)
+    const snap = await ref.get()
+    if (!snap.exists) return null
+    await ref.update(updates as Record<string, unknown>)
+    const updated = await ref.get()
+    return updated.data() as LinkageDoc
+  },
+
+  // --- Partners ---
+  async savePartner(id: string, doc: PartnerDoc) {
+    await db.collection('partners').doc(id).set(doc)
+  },
+
+  async getPartner(id: string): Promise<PartnerDoc | null> {
+    const snap = await db.collection('partners').doc(id).get()
+    return snap.exists ? (snap.data() as PartnerDoc) : null
+  },
+
+  async getAllPartners(): Promise<PartnerDoc[]> {
+    const snap = await db.collection('partners').get()
+    return snap.docs.map(d => d.data() as PartnerDoc)
+  },
+
+  async deletePartner(id: string): Promise<boolean> {
+    const ref = db.collection('partners').doc(id)
+    const snap = await ref.get()
+    if (!snap.exists) return false
+    await ref.delete()
+    return true
+  },
+
+  // --- Initiatives ---
+  async saveInitiative(id: string, doc: InitiativeDoc) {
+    await db.collection('initiatives').doc(id).set(doc)
+  },
+
+  async getInitiative(id: string): Promise<InitiativeDoc | null> {
+    const snap = await db.collection('initiatives').doc(id).get()
+    return snap.exists ? (snap.data() as InitiativeDoc) : null
+  },
+
+  async getAllInitiatives(): Promise<InitiativeDoc[]> {
+    const snap = await db.collection('initiatives').get()
+    return snap.docs.map(d => d.data() as InitiativeDoc)
+  },
 }
-
-function defaultPartners(): Record<string, PartnerDoc> {
-  const now = new Date().toISOString()
-  const rows: PartnerDoc[] = [
-    { partner_id: 'partner_001', org_name: 'Mastercard',         contact_name: 'Mastercard Team',    contact_email: 'partnerships@mastercard.com', partner_type: 'corporate',        industry: 'fintech',         status: 'active', created_at: now },
-    { partner_id: 'partner_002', org_name: 'Openspace Ventures', contact_name: 'Openspace Team',     contact_email: 'info@openspace.vc',           partner_type: 'investor',         industry: 'fintech/healthtech', status: 'active', created_at: now },
-    { partner_id: 'partner_003', org_name: 'Wong & Partners',    contact_name: 'Wong & Partners Team', contact_email: 'info@wongpartners.com',     partner_type: 'service_provider', industry: 'legal',           status: 'active', created_at: now },
-    { partner_id: 'partner_004', org_name: 'CIMB Bank',          contact_name: 'CIMB Team',          contact_email: 'partnerships@cimb.com',       partner_type: 'corporate',        industry: 'banking',         status: 'active', created_at: now },
-    { partner_id: 'partner_005', org_name: 'Iterative',          contact_name: 'Iterative Team',     contact_email: 'hello@iterative.vc',          partner_type: 'investor',         industry: 'B2B SaaS',        status: 'active', created_at: now },
-    { partner_id: 'partner_006', org_name: 'AWS Activate',       contact_name: 'AWS Team',           contact_email: 'activate@amazon.com',         partner_type: 'service_provider', industry: 'cloud',           status: 'active', created_at: now },
-    { partner_id: 'mentor_001',  org_name: 'Ahmad Razif',        contact_name: 'Ahmad Razif',        contact_email: 'ahmad.razif@mentor.com',      partner_type: 'mentor',           industry: 'fintech',         status: 'active', created_at: now },
-    { partner_id: 'mentor_002',  org_name: 'Priya Nair',         contact_name: 'Priya Nair',         contact_email: 'priya.nair@mentor.com',       partner_type: 'mentor',           industry: 'B2B SaaS',        status: 'active', created_at: now },
-    { partner_id: 'mentor_003',  org_name: 'David Tan',          contact_name: 'David Tan',          contact_email: 'david.tan@mentor.com',        partner_type: 'mentor',           industry: 'payments',        status: 'active', created_at: now },
-  ]
-  return Object.fromEntries(rows.map(r => [r.partner_id, r]))
-}
-
-function defaultInitiatives(): Record<string, InitiativeDoc> {
-  const now = new Date().toISOString()
-  const rows: InitiativeDoc[] = [
-    { initiative_id: 'init_001', name: 'CIP Accelerate',        type: 'accelerator', description: 'Seed-stage accelerator with funding, mentorship, lab access, and investor introductions.', focus_industries: ['fintech','healthtech','edtech','agritech'], funding_amount: 500000, next_intake: 'Q3 2026', status: 'active',   created_at: now },
-    { initiative_id: 'init_002', name: 'GAIN Grant',             type: 'grant',       description: 'Non-dilutive commercialisation grant for early Malaysian startups with quarterly Cradle reviews.', focus_industries: ['fintech','saas','deep tech'],              funding_amount: 150000, next_intake: 'Q2 2026', status: 'active',   created_at: now },
-    { initiative_id: 'init_003', name: 'Tech Startup Catalyst', type: 'incubator',   description: 'Six-month incubator for technical mentorship, market access workshops, and demo day readiness.', focus_industries: ['saas','edtech','healthtech'],              funding_amount: 250000, next_intake: 'Q4 2026', status: 'active',   created_at: now },
-  ]
-  return Object.fromEntries(rows.map(r => [r.initiative_id, r]))
-}
-
-function defaultLinkages(): Record<string, LinkageDoc> {
-  const now = new Date().toISOString()
-  const rows: LinkageDoc[] = [
-    { linkage_id: 'lnk_20260516_001', startup_id: 'startup_001', startup_name: 'PayEase',   actor_type: 'mentor',     partner_type: null,               actor_id: 'mentor_001',  actor_name: 'Ahmad Razif',        match_score: 92, match_reason: 'Fintech expertise at seed stage.',        status: 'active',  initiative_cycle: null,       created_at: now, outcome: null },
-    { linkage_id: 'lnk_20260516_002', startup_id: 'startup_001', startup_name: 'PayEase',   actor_type: 'initiative', partner_type: null,               actor_id: 'init_001',    actor_name: 'CIP Accelerate',     match_score: 90, match_reason: 'Targets fintech seed-stage startups.',    status: 'active',  initiative_cycle: 'Q3 2026',  created_at: now, outcome: null },
-    { linkage_id: 'lnk_20260516_003', startup_id: 'startup_001', startup_name: 'PayEase',   actor_type: 'partner',    partner_type: 'corporate',        actor_id: 'partner_001', actor_name: 'Mastercard',         match_score: 88, match_reason: 'Fintech pilot initiative.',               status: 'pending', initiative_cycle: null,       created_at: now, outcome: null },
-    { linkage_id: 'lnk_20260516_004', startup_id: 'startup_001', startup_name: 'PayEase',   actor_type: 'partner',    partner_type: 'investor',         actor_id: 'partner_002', actor_name: 'Openspace Ventures', match_score: 86, match_reason: 'B2B tech SEA focus.',                    status: 'active',  initiative_cycle: null,       created_at: now, outcome: null },
-    { linkage_id: 'lnk_20260516_005', startup_id: 'startup_001', startup_name: 'PayEase',   actor_type: 'partner',    partner_type: 'service_provider', actor_id: 'partner_003', actor_name: 'Wong & Partners',    match_score: 83, match_reason: 'Fintech legal specialists.',              status: 'active',  initiative_cycle: null,       created_at: now, outcome: null },
-    { linkage_id: 'lnk_20260515_001', startup_id: 'startup_002', startup_name: 'MediTrack', actor_type: 'mentor',     partner_type: null,               actor_id: 'mentor_002',  actor_name: 'Priya Nair',         match_score: 85, match_reason: 'B2B SaaS GTM experience.',               status: 'active',  initiative_cycle: null,       created_at: now, outcome: null },
-    { linkage_id: 'lnk_20260514_001', startup_id: 'startup_002', startup_name: 'MediTrack', actor_type: 'initiative', partner_type: null,               actor_id: 'init_002',    actor_name: 'GAIN Grant',         match_score: 76, match_reason: 'Commercialisation grant match.',          status: 'closed',  initiative_cycle: null,       created_at: now, outcome: 'Not selected' },
-  ]
-  return Object.fromEntries(rows.map(r => [r.linkage_id, r]))
-}
-
-class InMemoryStore {
-  private startups: Record<string, StartupDoc> = defaultStartups()
-  private linkages: Record<string, LinkageDoc> = defaultLinkages()
-  private partners: Record<string, PartnerDoc> = defaultPartners()
-  private initiatives: Record<string, InitiativeDoc> = defaultInitiatives()
-
-  saveStartup(id: string, doc: StartupDoc) {
-    this.startups[id] = doc
-  }
-
-  getStartup(id: string): StartupDoc | null {
-    return this.startups[id] ?? null
-  }
-
-  getAllStartups(): StartupDoc[] {
-    return Object.values(this.startups)
-  }
-
-  saveLinkage(doc: LinkageDoc) {
-    this.linkages[doc.linkage_id] = doc
-  }
-
-  getLinkage(id: string): LinkageDoc | null {
-    return this.linkages[id] ?? null
-  }
-
-  getAllLinkages(): LinkageDoc[] {
-    return Object.values(this.linkages)
-  }
-
-  updateLinkage(id: string, updates: Partial<LinkageDoc>): LinkageDoc | null {
-    if (!this.linkages[id]) return null
-    this.linkages[id] = { ...this.linkages[id], ...updates }
-    return this.linkages[id]
-  }
-
-  savePartner(id: string, doc: PartnerDoc) {
-    this.partners[id] = doc
-  }
-
-  getPartner(id: string): PartnerDoc | null {
-    return this.partners[id] ?? null
-  }
-
-  getAllPartners(): PartnerDoc[] {
-    return Object.values(this.partners)
-  }
-
-  getAllInitiatives(): InitiativeDoc[] {
-    return Object.values(this.initiatives)
-  }
-
-  getInitiative(id: string): InitiativeDoc | null {
-    return this.initiatives[id] ?? null
-  }
-
-  saveInitiative(id: string, doc: InitiativeDoc) {
-    this.initiatives[id] = doc
-  }
-}
-
-// Module-level singleton — persists across requests in dev/prod
-const globalStore = globalThis as typeof globalThis & { __store?: InMemoryStore }
-if (!globalStore.__store) globalStore.__store = new InMemoryStore()
-
-export const store = globalStore.__store
 
 export function docToLinkage(doc: LinkageDoc): Linkage {
   return {
@@ -192,12 +161,12 @@ export function docToLinkage(doc: LinkageDoc): Linkage {
     matchReason: doc.match_reason,
     status: doc.status as Linkage['status'],
     initiativeCycle: doc.initiative_cycle,
-    createdAt: doc.created_at,
+    createdAt: tsToISO(doc.created_at),
     outcome: doc.outcome,
   }
 }
 
-export function docToPartnerRecord(doc: ReturnType<InMemoryStore['getPartner']>): PartnerRecord | null {
+export function docToPartnerRecord(doc: PartnerDoc | null): PartnerRecord | null {
   if (!doc) return null
   return {
     partnerId: doc.partner_id,
@@ -207,11 +176,11 @@ export function docToPartnerRecord(doc: ReturnType<InMemoryStore['getPartner']>)
     partnerType: doc.partner_type as PartnerRecord['partnerType'],
     industry: doc.industry,
     status: doc.status as PartnerRecord['status'],
-    createdAt: doc.created_at,
+    createdAt: tsToISO(doc.created_at),
   }
 }
 
-export function docToInitiative(doc: ReturnType<InMemoryStore['getInitiative']>): Initiative | null {
+export function docToInitiative(doc: InitiativeDoc | null): Initiative | null {
   if (!doc) return null
   return {
     initiativeId: doc.initiative_id,
@@ -222,6 +191,6 @@ export function docToInitiative(doc: ReturnType<InMemoryStore['getInitiative']>)
     fundingAmount: doc.funding_amount,
     nextIntake: doc.next_intake,
     status: doc.status as Initiative['status'],
-    createdAt: doc.created_at,
+    createdAt: tsToISO(doc.created_at),
   }
 }
