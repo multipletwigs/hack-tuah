@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Matching Engine Network Wireframe</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f6fa;
+      color: #1a1a2e;
+      line-height: 1.5;
+    }
+    .admin-shell { display: flex; min-height: 100vh; }
+    .admin-sidebar {
+      width: 240px;
+      background: #1a1a2e;
+      color: #e2e8f0;
+      position: fixed;
+      inset: 0 auto 0 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .sidenav-brand { padding: 1.5rem 1.25rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .sidenav-brand-name { font-size: 1rem; font-weight: 700; color: #fff; }
+    .sidenav-brand-sub { font-size: 0.7rem; color: #475569; margin-top: 0.1rem; }
+    .sidenav-nav { flex: 1; padding: 0.75rem 0; }
+    .sidenav-section-label {
+      padding: 0.75rem 1.25rem 0.25rem;
+      font-size: 0.65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #475569;
+    }
+    .sidenav-item {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.6rem 1.25rem;
+      font-size: 0.875rem;
+      color: #94a3b8;
+      text-decoration: none;
+    }
+    .sidenav-item.active { background: rgba(79,110,247,0.18); color: #818cf8; font-weight: 500; }
+    .admin-main { margin-left: 240px; flex: 1; min-height: 100vh; }
+    .admin-content { padding: 2rem 2.5rem; max-width: 1440px; }
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .page-title { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .page-subtitle { color: #64748b; max-width: 760px; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.6rem 1.25rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      background: #fff;
+      color: #4f6ef7;
+      border: 1px solid #4f6ef7;
+    }
+    .btn-primary { background: #4f6ef7; color: #fff; border-color: #4f6ef7; }
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(620px, 1fr) 380px;
+      gap: 1.25rem;
+      align-items: start;
+    }
+    .section-card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+    }
+    .section-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .section-card-title { font-size: 0.9rem; font-weight: 600; color: #1a1a2e; }
+    .graph-card { min-height: 640px; display: flex; flex-direction: column; }
+    .graph-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .filter-tab {
+      padding: 0.35rem 0.85rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      background: #f1f5f9;
+      color: #64748b;
+    }
+    .filter-tab.active { background: #4f6ef7; color: #fff; }
+    .network-wrap {
+      position: relative;
+      flex: 1;
+      min-height: 520px;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      background:
+        linear-gradient(#f8fafc 1px, transparent 1px),
+        linear-gradient(90deg, #f8fafc 1px, transparent 1px),
+        #fff;
+      background-size: 32px 32px;
+      overflow: hidden;
+    }
+    .network-svg { width: 100%; height: 100%; min-height: 520px; display: block; }
+    .edge { stroke: #cbd5e1; stroke-width: 1.4; }
+    .edge.active { stroke: #4f6ef7; stroke-width: 2.5; }
+    .edge.match { stroke: #16a34a; stroke-width: 2.2; stroke-dasharray: 6 5; }
+    .node { cursor: pointer; }
+    .node circle { stroke: #fff; stroke-width: 3; filter: drop-shadow(0 7px 14px rgba(15,23,42,0.14)); }
+    .node text { font-size: 12px; font-weight: 700; fill: #1a1a2e; text-anchor: middle; pointer-events: none; }
+    .node .sub { font-size: 10px; font-weight: 600; fill: #64748b; }
+    .node.selected circle { stroke: #1a1a2e; stroke-width: 4; }
+    .node.matcher circle { fill: #4f6ef7; }
+    .node.matcher text, .node.matcher .sub { fill: #fff; }
+    .startup circle { fill: #eff2ff; }
+    .partner circle { fill: #fff7ed; }
+    .investor circle { fill: #f0fdf4; }
+    .service circle { fill: #f0f9ff; }
+    .mentor circle { fill: #fdf4ff; }
+    .initiative circle { fill: #fef2f2; }
+    .graph-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+      margin-top: 0.9rem;
+      font-size: 0.75rem;
+      color: #64748b;
+    }
+    .legend-item { display: inline-flex; align-items: center; gap: 0.35rem; }
+    .dot { width: 9px; height: 9px; border-radius: 99px; display: inline-block; }
+    .right-rail { display: flex; flex-direction: column; gap: 1.25rem; }
+    .chat-card { min-height: 390px; }
+    .chat-log { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1rem; }
+    .message {
+      border-radius: 10px;
+      padding: 0.7rem 0.85rem;
+      font-size: 0.85rem;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+    }
+    .message.user { background: #eff2ff; border-color: #dbe3ff; color: #243b9c; }
+    .message.agent strong { display: block; margin-bottom: 0.25rem; color: #1a1a2e; }
+    .tool-trace {
+      display: grid;
+      gap: 0.45rem;
+      margin-top: 0.75rem;
+    }
+    .tool-step {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+      padding: 0.45rem 0.6rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: #fff;
+      color: #475569;
+      font-size: 0.76rem;
+    }
+    .chat-input {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.6rem;
+      align-items: end;
+    }
+    textarea, input, select {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      background: #fff;
+      color: #1a1a2e;
+      font-family: inherit;
+    }
+    textarea { resize: vertical; min-height: 72px; }
+    .inspector-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin: 1rem 0;
+    }
+    .field-label {
+      font-size: 0.68rem;
+      color: #64748b;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.15rem;
+    }
+    .field-value { font-size: 0.88rem; font-weight: 600; color: #1a1a2e; }
+    .need-chip {
+      display: inline-flex;
+      margin: 0.2rem 0.25rem 0 0;
+      font-size: 0.7rem;
+      padding: 0.1rem 0.45rem;
+      border-radius: 99px;
+      background: #f1f5f9;
+      color: #475569;
+    }
+    .report-card { margin-top: 1.25rem; }
+    .report-layout {
+      display: grid;
+      grid-template-columns: 190px 1fr;
+      gap: 1rem;
+    }
+    .report-tabs {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .report-tab {
+      width: 100%;
+      text-align: left;
+      padding: 0.65rem 0.8rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: #fff;
+      color: #64748b;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .report-tab.active { background: #4f6ef7; color: #fff; border-color: #4f6ef7; }
+    .match-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+    .match-card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+      min-height: 188px;
+    }
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; }
+    .card-name { font-size: 0.94rem; font-weight: 700; }
+    .actor-tag {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 99px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      background: #eff2ff;
+      color: #4f6ef7;
+    }
+    .score-badge {
+      padding: 0.2rem 0.55rem;
+      border-radius: 99px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      white-space: nowrap;
+      background: #dcfce7;
+      color: #16a34a;
+    }
+    .match-reason {
+      font-size: 0.82rem;
+      color: #374151;
+      flex: 1;
+    }
+    .mutual-fit {
+      border-left: 3px solid #4f6ef7;
+      padding-left: 0.6rem;
+      color: #64748b;
+      font-size: 0.78rem;
+    }
+    .graph-mobile-note { display: none; color: #64748b; font-size: 0.8rem; }
+    @media (max-width: 1180px) {
+      .workspace { grid-template-columns: 1fr; }
+      .right-rail { display: grid; grid-template-columns: 1fr 1fr; }
+      .match-list { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 760px) {
+      .admin-sidebar { display: none; }
+      .admin-main { margin-left: 0; }
+      .admin-content { padding: 1.25rem; }
+      .page-header, .section-card-header, .chat-input, .report-layout { display: block; }
+      .workspace, .right-rail { display: block; }
+      .section-card { margin-bottom: 1rem; }
+      .network-wrap { min-height: 420px; }
+      .network-svg { min-height: 420px; }
+      .report-tabs { flex-direction: row; overflow-x: auto; margin-bottom: 1rem; }
+      .report-tab { min-width: 132px; }
+      .graph-mobile-note { display: block; margin-top: 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-shell">
+    <aside class="admin-sidebar">
+      <div class="sidenav-brand">
+        <div class="sidenav-brand-name">Cradle Portal</div>
+        <div class="sidenav-brand-sub">Ecosystem Manager</div>
+      </div>
+      <nav class="sidenav-nav">
+        <div class="sidenav-section-label">Navigation</div>
+        <a class="sidenav-item" href="#">[ ] Dashboard</a>
+        <a class="sidenav-item" href="#">[R] Startups</a>
+        <a class="sidenav-item" href="#">[P] Partners</a>
+        <a class="sidenav-item" href="#">[I] Initiatives</a>
+        <a class="sidenav-item active" href="#">[*] Matches</a>
+        <a class="sidenav-item" href="#">[L] Linkages</a>
+      </nav>
+    </aside>
+
+    <main class="admin-main">
+      <div class="admin-content">
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Matching Engine</h1>
+            <p class="page-subtitle">Agentic ecosystem graph for finding unmatched startups, generating top actor matches, and confirming linkages into the portal database.</p>
+          </div>
+          <button class="btn btn-primary">Run Matcher</button>
+        </div>
+
+        <div class="workspace">
+          <section class="section-card graph-card">
+            <div class="section-card-header">
+              <span class="section-card-title">Ecosystem Network</span>
+              <div class="graph-toolbar">
+                <button class="filter-tab active">All actors</button>
+                <button class="filter-tab">Unmatched</button>
+                <button class="filter-tab">Agriculture</button>
+                <button class="filter-tab">High score</button>
+              </div>
+            </div>
+
+            <div class="network-wrap">
+              <svg class="network-svg" viewBox="0 0 860 520" role="img" aria-label="Network graph wireframe">
+                <line class="edge active" x1="150" y1="260" x2="430" y2="260"></line>
+                <line class="edge match" x1="430" y1="260" x2="660" y2="100"></line>
+                <line class="edge match" x1="430" y1="260" x2="710" y2="235"></line>
+                <line class="edge match" x1="430" y1="260" x2="650" y2="405"></line>
+                <line class="edge" x1="430" y1="260" x2="230" y2="95"></line>
+                <line class="edge" x1="430" y1="260" x2="225" y2="420"></line>
+                <line class="edge" x1="430" y1="260" x2="430" y2="80"></line>
+                <line class="edge" x1="430" y1="260" x2="430" y2="455"></line>
+
+                <g class="node startup selected" data-name="FarmTrace" transform="translate(150 260)">
+                  <circle r="54"></circle>
+                  <text y="-4">FarmTrace</text>
+                  <text class="sub" y="15">agritech startup</text>
+                </g>
+                <g class="node matcher" data-name="Matcher" transform="translate(430 260)">
+                  <circle r="64"></circle>
+                  <text y="-4">Matcher</text>
+                  <text class="sub" y="17">agent core</text>
+                </g>
+                <g class="node mentor" data-name="Agri Mentor" transform="translate(230 95)">
+                  <circle r="45"></circle>
+                  <text y="-3">Mentor</text>
+                  <text class="sub" y="15">ops</text>
+                </g>
+                <g class="node investor" data-name="Seed Investor" transform="translate(430 80)">
+                  <circle r="45"></circle>
+                  <text y="-3">Investor</text>
+                  <text class="sub" y="15">seed</text>
+                </g>
+                <g class="node partner" data-name="CIMB" transform="translate(660 100)">
+                  <circle r="48"></circle>
+                  <text y="-3">CIMB</text>
+                  <text class="sub" y="15">partner</text>
+                </g>
+                <g class="node service" data-name="AWS Activate" transform="translate(710 235)">
+                  <circle r="50"></circle>
+                  <text y="-3">AWS</text>
+                  <text class="sub" y="15">service</text>
+                </g>
+                <g class="node initiative" data-name="CIP Accelerate" transform="translate(650 405)">
+                  <circle r="52"></circle>
+                  <text y="-3">CIP</text>
+                  <text class="sub" y="15">program</text>
+                </g>
+                <g class="node startup" data-name="PayEase" transform="translate(225 420)">
+                  <circle r="43"></circle>
+                  <text y="-3">PayEase</text>
+                  <text class="sub" y="15">fintech</text>
+                </g>
+                <g class="node initiative" data-name="GAIN Grant" transform="translate(430 455)">
+                  <circle r="43"></circle>
+                  <text y="-3">GAIN</text>
+                  <text class="sub" y="15">grant</text>
+                </g>
+              </svg>
+            </div>
+
+            <div class="graph-legend">
+              <span class="legend-item"><span class="dot" style="background:#4f6ef7"></span> Matcher</span>
+              <span class="legend-item"><span class="dot" style="background:#dbe3ff"></span> Startups</span>
+              <span class="legend-item"><span class="dot" style="background:#fed7aa"></span> Partners</span>
+              <span class="legend-item"><span class="dot" style="background:#bbf7d0"></span> Investors</span>
+              <span class="legend-item"><span class="dot" style="background:#bae6fd"></span> Service providers</span>
+              <span class="legend-item"><span class="dot" style="background:#fecaca"></span> Initiatives</span>
+            </div>
+            <p class="graph-mobile-note">Mobile wireframe stacks graph, chat, inspector, and report vertically.</p>
+          </section>
+
+          <aside class="right-rail">
+            <section class="section-card chat-card">
+              <div class="section-card-header">
+                <span class="section-card-title">Agent Chat</span>
+                <span class="actor-tag">ReAct trace</span>
+              </div>
+              <div class="chat-log">
+                <div class="message user">Who are the startups that are not matched yet in the agriculture sector?</div>
+                <div class="message agent">
+                  <strong>Matcher</strong>
+                  Found 1 unmatched agriculture startup. Running partner, mentor, and initiative search for FarmTrace.
+                  <div class="tool-trace">
+                    <div class="tool-step"><span>fetch_startup_list</span><span>4 rows</span></div>
+                    <div class="tool-step"><span>filter_unmatched</span><span>1 row</span></div>
+                    <div class="tool-step"><span>search_partners</span><span>3 candidates</span></div>
+                    <div class="tool-step"><span>submit_matches</span><span>report ready</span></div>
+                  </div>
+                </div>
+              </div>
+              <div class="chat-input">
+                <textarea>Find matches for FarmTrace and show top 3 partners, programs, and initiatives.</textarea>
+                <button class="btn btn-primary">Send</button>
+              </div>
+            </section>
+
+            <section class="section-card">
+              <div class="section-card-header">
+                <span class="section-card-title">Selected Node</span>
+                <button class="btn">Open profile</button>
+              </div>
+              <h2 class="page-title" style="font-size:1.2rem;margin-bottom:0.15rem;">FarmTrace</h2>
+              <p class="page-subtitle" style="margin-bottom:0.8rem;">Smallholder supply chains lack traceability.</p>
+              <div class="inspector-grid">
+                <div>
+                  <div class="field-label">Industry</div>
+                  <div class="field-value">agritech</div>
+                </div>
+                <div>
+                  <div class="field-label">Stage</div>
+                  <div class="field-value">seed</div>
+                </div>
+                <div>
+                  <div class="field-label">Status</div>
+                  <div class="field-value">unmatched</div>
+                </div>
+                <div>
+                  <div class="field-label">Score band</div>
+                  <div class="field-value">82 to 91</div>
+                </div>
+              </div>
+              <div>
+                <div class="field-label">Needs</div>
+                <span class="need-chip">mentorship</span>
+                <span class="need-chip">pilot partners</span>
+                <span class="need-chip">market access</span>
+              </div>
+            </section>
+          </aside>
+        </div>
+
+        <section class="section-card report-card">
+          <div class="section-card-header">
+            <div>
+              <span class="section-card-title">Matching Report</span>
+              <p class="page-subtitle" style="margin:0.25rem 0 0;">Top recommendations generated from the selected startup funnel. Confirmed cards create linkages.</p>
+            </div>
+            <button class="btn">Export report</button>
+          </div>
+
+          <div class="report-layout">
+            <div class="report-tabs">
+              <button class="report-tab active">Partners</button>
+              <button class="report-tab">Programs</button>
+              <button class="report-tab">Initiatives</button>
+              <button class="report-tab">Agent Trace</button>
+            </div>
+
+            <div class="match-list">
+              <article class="match-card">
+                <div class="card-header">
+                  <div>
+                    <div class="card-name">CIMB Bank</div>
+                    <span class="actor-tag" style="background:#fff7ed;color:#ea580c;">corporate</span>
+                  </div>
+                  <span class="score-badge">91%</span>
+                </div>
+                <p class="match-reason">Strong pilot fit for supply-chain financing and SME banking access.</p>
+                <p class="mutual-fit">Mutual fit: FarmTrace offers transaction visibility into smallholder ecosystems CIMB wants to reach.</p>
+                <button class="btn btn-primary">Confirm Linkage</button>
+              </article>
+
+              <article class="match-card">
+                <div class="card-header">
+                  <div>
+                    <div class="card-name">AWS Activate</div>
+                    <span class="actor-tag" style="background:#f0f9ff;color:#0284c7;">service</span>
+                  </div>
+                  <span class="score-badge">87%</span>
+                </div>
+                <p class="match-reason">Cloud credits and technical support fit FarmTrace's data platform buildout.</p>
+                <p class="mutual-fit">Mutual fit: AWS gains a credible agri supply-chain cloud workload.</p>
+                <button class="btn btn-primary">Confirm Linkage</button>
+              </article>
+
+              <article class="match-card">
+                <div class="card-header">
+                  <div>
+                    <div class="card-name">CIP Accelerate</div>
+                    <span class="actor-tag" style="background:#fef2f2;color:#dc2626;">program</span>
+                  </div>
+                  <span class="score-badge">84%</span>
+                </div>
+                <p class="match-reason">Seed-stage accelerator eligibility and market access match the startup's needs.</p>
+                <p class="mutual-fit">Mutual fit: FarmTrace sits inside the program focus on tech-enabled Malaysian growth sectors.</p>
+                <button class="btn btn-primary">Confirm Linkage</button>
+              </article>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const nodes = document.querySelectorAll('.node');
+    const title = document.querySelector('.right-rail .page-title');
+    nodes.forEach((node) => {
+      node.addEventListener('click', () => {
+        nodes.forEach((item) => item.classList.remove('selected'));
+        node.classList.add('selected');
+        title.textContent = node.getAttribute('data-name');
+      });
+    });
+  </script>
+</body>
+</html>
