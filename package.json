@@ -26,9 +26,5 @@
     "tailwindcss": "^4",
     "typescript": "^5"
   },
-  "pnpm": {
-    "neverBuiltDependencies": [
-      "@google/genai"
-    ]
-  }
+}
 }
