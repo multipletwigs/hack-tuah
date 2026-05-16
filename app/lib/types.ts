@@ -1,4 +1,26 @@
 export type ActorType = 'mentor' | 'programme' | 'partner'
+
+export interface Initiative {
+  initiativeId: string
+  name: string
+  type: 'accelerator' | 'grant' | 'incubator' | 'programme' | 'challenge'
+  focusIndustries: string[]
+  fundingAmount: number | null
+  nextIntake: string | null
+  status: 'active' | 'upcoming' | 'closed'
+  createdAt: string
+}
+
+export interface PartnerRecord {
+  partnerId: string
+  orgName: string
+  contactName: string
+  contactEmail: string
+  partnerType: PartnerType | 'mentor'
+  industry: string
+  status: 'active' | 'pending_review'
+  createdAt: string
+}
 export type PartnerType = 'corporate' | 'investor' | 'service_provider'
 
 export interface StartupProfile {

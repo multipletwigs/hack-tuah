@@ -8,7 +8,7 @@ interface Props {
 export default function Nav({ rightLabel, rightHref }: Props) {
   return (
     <nav className="nav">
-      <Link href="/" className="nav-logo">Cradle Portal</Link>
+      <Link href="/admin" className="nav-logo">Cradle Portal</Link>
       {rightLabel && rightHref && (
         <Link href={rightHref} className="nav-link">{rightLabel}</Link>
       )}
