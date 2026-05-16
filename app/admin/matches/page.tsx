@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useEffect } from 'react'
 import Toast, { showToast } from '@/app/components/Toast'
-import LoadingOverlay from '@/app/components/LoadingOverlay'
+import LoadingOverlay, { type LoadingOverlayStep } from '@/app/components/LoadingOverlay'
 import type { AgentMatchResult, MatchEntry } from '@/app/lib/matching-agent'
 
 interface StartupRow {
@@ -173,6 +173,10 @@ function placeArc(
   })
 }
 
+function step(tool: string, detail: string): LoadingOverlayStep {
+  return { tool, detail, status: 'queued' }
+}
+
 function getGroupActors(
   group: GroupKind,
   startups: StartupRow[],
@@ -329,6 +333,7 @@ export default function MatchesPage() {
   // const [messages, setMessages] = useState<{ role: string; text: string }[]>([])
   // const [reportTab, setReportTab] = useState<ReportTab>('partners')
   const [loading, setLoading] = useState(false)
+  const [loadingSteps, setLoadingSteps] = useState<LoadingOverlayStep[]>([])
   const [result, setResult] = useState<AgentMatchResult | null>(null)
   const [confirmed, setConfirmed] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
@@ -340,6 +345,26 @@ export default function MatchesPage() {
     fetch('/api/linkages').then(r => r.json()).then(setLinkages)
   }, [])
 
+  useEffect(() => {
+    if (!loading || loadingSteps.length === 0) return
+
+    let activeIndex = 0
+    setLoadingSteps(prev => prev.map((item, index) => ({
+      ...item,
+      status: index === 0 ? 'active' : 'queued',
+    })))
+
+    const interval = window.setInterval(() => {
+      activeIndex = Math.min(activeIndex + 1, loadingSteps.length - 1)
+      setLoadingSteps(prev => prev.map((item, index) => ({
+        ...item,
+        status: index < activeIndex ? 'done' : index === activeIndex ? 'active' : 'queued',
+      })))
+    }, 1100)
+
+    return () => window.clearInterval(interval)
+  }, [loading, loadingSteps.length])
+
   const linkedStartupIds = useMemo(() => new Set(linkages.map(l => l.startupId)), [linkages])
   const selectedStartup    = selectedKind === 'startup'    ? startups.find(s => s.startup_id === selectedId)  : undefined
   const selectedPartner    = (selectedKind !== 'startup' && selectedKind !== 'matcher' && selectedKind !== 'initiative')
@@ -348,11 +373,37 @@ export default function MatchesPage() {
   const selectedActorName  = selectedStartup?.startup_name ?? selectedPartner?.orgName ?? selectedInitiative?.name ?? ''
   const fromStartup        = result?.direction === 'from-startup'
 
+  function buildLoadingSteps(id: string, kind: GraphNodeKind): LoadingOverlayStep[] {
+    const startup = startups.find(s => s.startup_id === id)
+    const partner = partners.find(p => p.partnerId === id)
+    const initiative = initiatives.find(i => i.initiativeId === id)
+    const name = startup?.startup_name ?? partner?.orgName ?? initiative?.name ?? id
+
+    if (kind === 'startup') {
+      return [
+        step('get_startup_profile', `Fetching ${name}'s profile, stage, needs, and existing linkages.`),
+        step('search_mentors', 'Fetching mentor candidates filtered by industry expertise.'),
+        step('search_partners', 'Fetching corporate, investor, and service provider candidates.'),
+        step('search_initiatives', 'Fetching grants, accelerators, programmes, and challenges.'),
+        step('submit_matches', 'Scoring reciprocal fit and returning the ranked match lists.'),
+      ]
+    }
+
+    return [
+      step('load_actor_profile', `Fetching ${name}'s profile, relationship history, and seed data context.`),
+      step('fetch_startups', 'Fetching startup candidates for reciprocal ecosystem fit.'),
+      step('fetch_partners', 'Fetching mentor, corporate, investor, and service provider candidates.'),
+      step('fetch_initiatives', 'Fetching initiative candidates and eligibility context.'),
+      step('rank_matches_with_llm', 'Scoring mutual value and returning the ranked match lists.'),
+    ]
+  }
+
   async function generate(id: string, kind: GraphNodeKind) {
     if (!id || id === 'matcher') return
     setSelectedId(id)
     setSelectedKind(kind)
     setSelectedNodeId(id)
+    setLoadingSteps(buildLoadingSteps(id, kind))
     setLoading(true)
     setResult(null)
     setConfirmed(new Set())
@@ -371,6 +422,7 @@ export default function MatchesPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate matches')
     } finally {
+      setLoadingSteps(prev => prev.map(item => ({ ...item, status: 'done' })))
       setLoading(false)
     }
   }
@@ -559,7 +611,12 @@ export default function MatchesPage() {
         </aside>
       </div>
 
-      <LoadingOverlay visible={loading} message="Agent is thinking..." sub="Fetching and filtering ecosystem actors" />
+      <LoadingOverlay
+        visible={loading}
+        message="Matching engine is working"
+        sub="Showing tool calls, fetched context, and ranking progress while results are prepared."
+        steps={loadingSteps}
+      />
       <Toast />
     </div>
   )

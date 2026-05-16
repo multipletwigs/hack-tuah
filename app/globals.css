@@ -187,9 +187,42 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; b
   display: flex; align-items: center; justify-content: center; z-index: 50;
 }
 .overlay.hidden { display: none; }
-.overlay-box { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+.overlay-box {
+  text-align: center; display: flex; flex-direction: column; align-items: center; gap: 1rem;
+  width: min(92vw, 520px); background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 1.5rem; box-shadow: 0 18px 45px rgba(15,23,42,0.12);
+}
 .overlay-text { font-size: 1.1rem; font-weight: 600; }
 .overlay-sub  { font-size: 0.875rem; color: #64748b; }
+.overlay-steps {
+  width: 100%; margin: 0; padding: 0; list-style: none;
+  display: flex; flex-direction: column; gap: 0.55rem; text-align: left;
+}
+.overlay-step {
+  display: grid; grid-template-columns: 18px 1fr; gap: 0.65rem; align-items: start;
+  padding: 0.65rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 8px;
+  background: #f8fafc; opacity: 0.72;
+}
+.overlay-step-active {
+  border-color: #4f6ef7; background: #eff2ff; opacity: 1;
+}
+.overlay-step-done { opacity: 1; }
+.overlay-step-status {
+  width: 10px; height: 10px; margin-top: 0.28rem; border-radius: 50%;
+  background: #cbd5e1; box-shadow: 0 0 0 3px rgba(203,213,225,0.28);
+}
+.overlay-step-active .overlay-step-status {
+  background: #4f6ef7; box-shadow: 0 0 0 3px rgba(79,110,247,0.16);
+}
+.overlay-step-done .overlay-step-status {
+  background: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,0.14);
+}
+.overlay-step-body { min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.overlay-step-tool {
+  color: #1e293b; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.78rem; font-weight: 700; overflow-wrap: anywhere;
+}
+.overlay-step-detail { color: #64748b; font-size: 0.8rem; line-height: 1.35; }
 .spinner {
   width: 40px; height: 40px; border: 3px solid #e2e8f0;
   border-top-color: #4f6ef7; border-radius: 50%;
