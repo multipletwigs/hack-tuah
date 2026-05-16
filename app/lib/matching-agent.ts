@@ -29,6 +29,25 @@ export interface AgentMatchResult {
   direction: 'from-startup' | 'from-actor'
 }
 
+function preview(value: string, limit = 700): string {
+  return value.length > limit ? `${value.slice(0, limit)}...` : value
+}
+
+function summarizeToolResult(result: unknown): Record<string, unknown> {
+  if (!result || typeof result !== 'object') return { type: typeof result }
+  const record = result as Record<string, unknown>
+  return Object.fromEntries(
+    Object.entries(record).map(([key, value]) => [
+      key,
+      Array.isArray(value) ? { count: value.length } : typeof value,
+    ]),
+  )
+}
+
+function logAgent(requestId: string, event: string, data: Record<string, unknown> = {}) {
+  console.info('[matching-agent]', { requestId, event, ...data })
+}
+
 const MATCH_ITEM = {
   type: 'object' as const,
   properties: {
@@ -168,8 +187,16 @@ For each match_reason (exactly 2 sentences):
 
 Score range: 60–100. Be selective — only include actors with genuine alignment.`
 
-export async function runMatchingAgent(startupId: string): Promise<AgentMatchResult> {
+export async function runMatchingAgent(startupId: string, requestId = crypto.randomUUID()): Promise<AgentMatchResult> {
   const model = getModel(TOOL_DECLARATIONS)
+  const firstMessage = `Find ecosystem matches for startup ID: ${startupId}. Begin by fetching the startup profile.`
+
+  logAgent(requestId, 'startup-agent-start', {
+    startupId,
+    systemPromptLength: SYSTEM_PROMPT.length,
+    firstMessage,
+    tools: TOOL_DECLARATIONS.map(tool => tool.name),
+  })
 
   const chat = model.startChat({
     history: [
@@ -179,12 +206,19 @@ export async function runMatchingAgent(startupId: string): Promise<AgentMatchRes
   })
 
   const steps: AgentStep[] = []
-  let result = await chat.sendMessage(
-    `Find ecosystem matches for startup ID: ${startupId}. Begin by fetching the startup profile.`
-  )
+  logAgent(requestId, 'model-call', { call: 1, kind: 'initial-chat' })
+  let modelCallCount = 1
+  let result = await chat.sendMessage(firstMessage)
 
   for (let i = 0; i < 10; i++) {
     const calls = responseFunctionCalls(result.response)
+    logAgent(requestId, 'model-response', {
+      call: modelCallCount,
+      loop: i,
+      functionCalls: calls?.map(call => call.name) ?? [],
+      textPreview: preview(responseText(result.response)),
+    })
+
     if (!calls || calls.length === 0) break
 
     const responses = []
@@ -192,6 +226,15 @@ export async function runMatchingAgent(startupId: string): Promise<AgentMatchRes
     for (const call of calls) {
       if (call.name === 'submit_matches') {
         const args = call.args as Record<string, Array<Record<string, unknown>>>
+        logAgent(requestId, 'submit-matches', {
+          modelCalls: modelCallCount,
+          steps: steps.length,
+          mentors: args.mentors?.length ?? 0,
+          corporatePartners: args.corporate_partners?.length ?? 0,
+          investors: args.investors?.length ?? 0,
+          serviceProviders: args.service_providers?.length ?? 0,
+          initiatives: args.initiatives?.length ?? 0,
+        })
         return {
           steps,
           direction:         'from-startup' as const,
@@ -205,17 +248,30 @@ export async function runMatchingAgent(startupId: string): Promise<AgentMatchRes
       }
 
       const toolResult = executeTool(call.name, call.args as Record<string, string>)
+      logAgent(requestId, 'tool-call', {
+        loop: i,
+        tool: call.name,
+        args: call.args,
+        result: summarizeToolResult(toolResult),
+      })
       steps.push({ tool: call.name, args: call.args as Record<string, unknown>, result: toolResult })
       responses.push({ functionResponse: { name: call.name, response: { result: toolResult } } })
     }
 
+    modelCallCount += 1
+    logAgent(requestId, 'model-call', {
+      call: modelCallCount,
+      kind: 'tool-response-chat',
+      toolResponses: responses.map(response => response.functionResponse.name),
+    })
     result = await chat.sendMessage(responses)
   }
 
+  logAgent(requestId, 'startup-agent-empty-result', { modelCalls: modelCallCount, steps: steps.length })
   return { steps, direction: 'from-startup' as const, startups: [], mentors: [], corporatePartners: [], investors: [], serviceProviders: [], initiatives: [] }
 }
 
-export async function runActorMatching(actorId: string, actorType: 'partner' | 'initiative'): Promise<AgentMatchResult> {
+export async function runActorMatching(actorId: string, actorType: 'partner' | 'initiative', requestId = crypto.randomUUID()): Promise<AgentMatchResult> {
   const empty = { steps: [], direction: 'from-actor' as const, startups: [], mentors: [], corporatePartners: [], investors: [], serviceProviders: [], initiatives: [] }
 
   let actorProfile: string
@@ -290,9 +346,23 @@ Find the top 3 startups that best fit this actor. Return JSON only (no markdown 
 
 Score range 60-100. Top 3 only.`
 
+  logAgent(requestId, 'actor-agent-start', {
+    actorId,
+    actorType,
+    promptLength: prompt.length,
+    startupCount: store.getAllStartups().length,
+    promptPreview: preview(prompt),
+  })
+
   const model = getModel()
+  logAgent(requestId, 'model-call', { call: 1, kind: 'actor-generate-content' })
   const res = await model.generateContent(prompt)
   const text = responseText(res.response).replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+  logAgent(requestId, 'model-response', {
+    call: 1,
+    textLength: text.length,
+    textPreview: preview(text),
+  })
   const parsed = JSON.parse(text)
   return {
     ...empty,
