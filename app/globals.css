@@ -373,6 +373,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; b
 .node.service circle { fill: #f0f9ff; }
 .node.mentor circle { fill: #fdf4ff; }
 .node.initiative circle { fill: #fef2f2; }
+.node.matched circle { stroke: #16a34a; stroke-width: 3.5; filter: drop-shadow(0 0 8px rgba(22,163,74,0.45)); }
+.node.group-node circle { stroke-width: 2.5; }
+.match-dot { fill: #16a34a; }
 .network-legend {
   display: flex; flex-wrap: wrap; gap: 0.65rem; margin-top: 0.9rem;
   font-size: 0.75rem; color: #64748b;

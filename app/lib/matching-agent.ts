@@ -10,7 +10,7 @@ export interface AgentStep {
 export interface MatchEntry {
   actorId: string
   actorName: string
-  actorType: 'mentor' | 'partner' | 'initiative'
+  actorType: 'startup' | 'mentor' | 'partner' | 'initiative'
   partnerType: string | null
   matchScore: number
   matchReason: string
@@ -23,6 +23,8 @@ export interface AgentMatchResult {
   investors: MatchEntry[]
   serviceProviders: MatchEntry[]
   initiatives: MatchEntry[]
+  startups: MatchEntry[]
+  direction: 'from-startup' | 'from-actor'
 }
 
 const MATCH_ITEM = {
@@ -198,6 +200,8 @@ export async function runMatchingAgent(startupId: string): Promise<AgentMatchRes
         const args = call.args as Record<string, Array<Record<string, unknown>>>
         return {
           steps,
+          direction:         'from-startup' as const,
+          startups:          [],
           mentors:           (args.mentors           ?? []).map(x => toEntry(x, 'mentor',     null)),
           corporatePartners: (args.corporate_partners ?? []).map(x => toEntry(x, 'partner',    'corporate')),
           investors:         (args.investors          ?? []).map(x => toEntry(x, 'partner',    'investor')),
@@ -214,5 +218,60 @@ export async function runMatchingAgent(startupId: string): Promise<AgentMatchRes
     result = await chat.sendMessage(responses)
   }
 
-  return { steps, mentors: [], corporatePartners: [], investors: [], serviceProviders: [], initiatives: [] }
+  return { steps, direction: 'from-startup' as const, startups: [], mentors: [], corporatePartners: [], investors: [], serviceProviders: [], initiatives: [] }
+}
+
+export async function runActorMatching(actorId: string, actorType: 'partner' | 'initiative'): Promise<AgentMatchResult> {
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) throw new Error('GEMINI_API_KEY is not set')
+
+  const empty = { steps: [], direction: 'from-actor' as const, startups: [], mentors: [], corporatePartners: [], investors: [], serviceProviders: [], initiatives: [] }
+
+  let actorProfile: string
+  if (actorType === 'partner') {
+    const doc = store.getPartner(actorId)
+    if (!doc) throw new Error(`Partner '${actorId}' not found`)
+    const rec = docToPartnerRecord(doc)!
+    actorProfile = `Type: ${rec.partnerType}\nOrg: ${rec.orgName}\nIndustry: ${rec.industry}`
+  } else {
+    const doc = store.getInitiative(actorId)
+    if (!doc) throw new Error(`Initiative '${actorId}' not found`)
+    const init = docToInitiative(doc)!
+    actorProfile = `Type: initiative / ${init.type}\nName: ${init.name}\nFocus Industries: ${init.focusIndustries.join(', ')}\nStatus: ${init.status}`
+  }
+
+  const startupList = store.getAllStartups().map(s =>
+    `ID: ${s.startup_id} | ${s.startup_name} | ${s.industry} | ${s.stage} | needs: ${(s.needs ?? []).join(', ')}`
+  ).join('\n')
+
+  const prompt = `You are a Cradle ecosystem matching agent.
+
+ACTOR PROFILE:
+${actorProfile}
+
+STARTUPS:
+${startupList}
+
+Find the top 3 startups that best fit this actor. Return JSON only (no markdown fences):
+{
+  "startups": [
+    { "actor_id": "startup_id", "actor_name": "name", "match_score": 75, "match_reason": "Sentence 1: what this startup needs that this actor provides. Sentence 2: why this actor is strategically interested in this startup." }
+  ]
+}
+
+Score range 60-100. Top 3 only.`
+
+  try {
+    const genAI = new GoogleGenerativeAI(apiKey)
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    const res = await model.generateContent(prompt)
+    const text = res.response.text().replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    const parsed = JSON.parse(text)
+    return {
+      ...empty,
+      startups: (parsed.startups ?? []).map((x: Record<string, unknown>) => toEntry(x, 'startup', null)),
+    }
+  } catch {
+    return empty
+  }
 }
