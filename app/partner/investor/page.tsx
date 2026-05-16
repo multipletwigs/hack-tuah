@@ -54,7 +54,7 @@ export default function InvestorForm() {
       const res = await fetch('/api/partners', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orgName: form.fundName, contactName: form.contactName, contactEmail: form.contactEmail, partnerType: 'investor', ...form }),
+        body: JSON.stringify({ ...form, orgName: form.fundName, partnerType: 'investor' }),
       })
       if (!res.ok) throw new Error((await res.json()).error)
       setSubmitted(true)
